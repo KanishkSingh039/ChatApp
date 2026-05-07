@@ -3,6 +3,7 @@ import Register from "../components/register-page";
 import Login from "../components/login-page";
 import Chat from "../components/chat";
 import { io } from "socket.io-client";
+import Home from "../components/homepage";
 
 function App() {
   const socket=io("http://localhost:3456");
@@ -13,6 +14,7 @@ function App() {
         <Route path='/register' element={<Register/>}/>
         <Route path='/login' element={<Login/>}/>
         <Route path="/chat" element={<Chat socket={socket}/>}/>
+        <Route path='/home' element={<Home socket={socket}/>}/>
       </Routes>
     </div>
    );

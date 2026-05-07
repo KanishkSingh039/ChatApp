@@ -7,9 +7,10 @@ export const Headcontext = createContext({
 
 export function Context({ children }) {
   const [token, settoken] = useState('');
+  const [user,setuser]=useState('');
 
   return (
-    <Headcontext.Provider value={{ token, settoken }}>
+    <Headcontext.Provider value={{ token, settoken,user,setuser }}>
       {children}
     </Headcontext.Provider>
   );

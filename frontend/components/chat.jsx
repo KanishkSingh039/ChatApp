@@ -5,7 +5,7 @@ function Chat({socket}) {
     const [currentmessage,setcurrentmessage]=useState('');
     const [chat,setchat]=useState([]);
     const [currentuser,setcurrentuser]=useState('');
-    const {token}=useContext(Headcontext);   
+    const {token,setuser}=useContext(Headcontext);   
     const[detailing,setdetailing]=useState(); 
     const navigate=useNavigate();
     useEffect(()=>{
@@ -86,6 +86,10 @@ async function fetching(token1) {
             </div>
             <input className="bg-gray-500" type="text" value={currentmessage} onChange={e=>setcurrentmessage(e.target.value)} />
             <button className="bg-white w-[5%] h-[3%] rounded-2xl" onClick={()=>onclick()}>send</button>
+            <button className="bg-white w-[5%] h-[3%] rounded-2xl" onClick={()=>{navigate('/home');
+                setuser(detailing.user);
+            }}>home</button>
+
 
     </div> );
 }
