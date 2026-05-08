@@ -53,5 +53,19 @@ const roomsocket=(io,socket)=>{
             message:"user added"
         })
     })
+    socket.on('finduser',async(data)=>{
+        const finduser=await user.findOne({name:data});
+        if(!finduser)
+        {
+            return socket.emit('userid',{
+                message:"user is not found"
+            })
+        }
+
+        return socket.emit('userid',{
+            success:true,
+            id:finduser._id
+    });
+    })
 }
 module.exports=roomsocket
