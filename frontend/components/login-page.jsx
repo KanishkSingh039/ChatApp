@@ -33,7 +33,7 @@ function Login() {
         if (data.token) {
             localStorage.setItem('token',data.token);
             settoken(data.token);
-            navigate("/chat");
+            navigate("/main/chat");
             } else {
             console.log("Login failed:", data.message);
             }

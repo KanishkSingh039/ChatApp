@@ -8,6 +8,8 @@ function Home({socket}) {
  const {user}=useContext(Headcontext);
  const[name,setname]=useState('');
  const [joinroomId,setjoinroomId]=useState('');
+ const [findfriend,setfindfriend]=useState('');
+ const[friend,setfriend]=useState('');
  const [id,setid]=useState('');
  const [room,setroom]=useState([]);
 
@@ -32,12 +34,21 @@ function Home({socket}) {
                 setid(data.id)
             }
         });
-        
+        socket.on('friendfinded',(data)=>{
+            console.log(data);
+            setfriend(data.friend);
+        })
+        socket.on('roomcreatedwithfriend',(data)=>{
+            console.log(data);
+            
+        })
        
         return()=>{
             socket.off('roomcreated');
             socket.off('error');
             socket.off('userid')
+            socket.off('friendfinded');
+            socket.off('roomcreatedwithfriend')
         }
     },[]);
     useEffect(() => {
@@ -60,6 +71,17 @@ function Home({socket}) {
         socket.emit('joinroom',{joinroomId,
             user
         });
+    }
+    function onfindfriend(){
+        socket.emit('findfriend',{
+            uniqueId:findfriend
+        })
+    }
+    function addfriend() {
+        socket.emit('createroomwiththefriend',{
+            id,
+            friend
+        })
     }
     async function fetchroom(_id)
     {
@@ -96,11 +118,18 @@ function Home({socket}) {
         }}>Direct message</button>
         <input type="text" value={joinroomId} onChange={(e)=>setjoinroomId(e.target.value)}/>
         <button onClick={()=>onjoinclick()}>join room</button>
+        <input type="text" value={findfriend} onChange={(e)=>setfindfriend(e.target.value)}/>
+        <button onClick={()=>onfindfriend()}>Findfriend</button>
+        <button onClick={()=>{
+            addfriend()
+        }}>addfriend</button>
+
         <ul >
         {room?.map(data=>{
-            return <li key={data._id}>{data._id}</li>
+            return <li key={data._id}>{data.name}</li>
         })}
         </ul>
+        
     </div> );
 }
 

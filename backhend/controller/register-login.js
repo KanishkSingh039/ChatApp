@@ -9,19 +9,28 @@ const register=async(req,res)=>{
                 message:"please enter all the credentials"
             })
         }
-        const {name,email,password}=req.body;
+        const {name,uniqueId,email,password}=req.body;
         const finduserbyemail=await user.findOne({email});
         if(finduserbyemail)
         {
             return res.status(400).json({
                 message:"user already exists with this email"
             })
+        };
+        const finduserbyuniqueId=await user.findOne({uniqueId});
+        if(finduserbyuniqueId)
+        {
+            return res.status(400).json({
+                message:"user already exists with this uniqueId"
+            });
         }
+
         const salt=10;
         const gsalt=await bcrypt.genSalt(salt);
         const hashpassword=await bcrypt.hash(password,salt);
         const createuser=await user.create({
             name,
+            uniqueId,
             email,
             password:hashpassword
         });

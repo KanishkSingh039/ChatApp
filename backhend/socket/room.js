@@ -40,7 +40,7 @@ const roomsocket=(io,socket)=>{
                     message:"user already exists in the room"
                 })
             }
-        if(findroom.members.length>=2){
+        if(findroom.members.length>=100){
             return socket.emit('joinroom-response',{
                 message:"room is full"
             })
@@ -66,6 +66,59 @@ const roomsocket=(io,socket)=>{
             success:true,
             id:finduser._id
     });
+    })
+    socket.on('findfriend',async(data)=>{
+        const {uniqueId}=data;
+        const findfrindwithuniqueId=await user.findOne({uniqueId});
+        if(!findfrindwithuniqueId)
+        {
+            return socket.emit('friendfinded',{
+                message:"user not found with this uniqueId"
+            })
+        }
+        return socket.emit('friendfinded',{
+            friend:findfrindwithuniqueId
+        })
+    })
+
+    socket.on('createroomwiththefriend',async(data)=>{
+        try {
+            console.log(data);
+        console.log(data.friend);
+        
+        if(!data.id||!data.friend){
+            return socket.emit('roomcreatedwithfriend',{
+                message:`check the data which is ${data.id,data.friend}`
+            })
+        }
+        const alreadyinroom = await room.findOne({
+            members: {
+                $all: [data.id, data.friend.id]
+            }
+        });
+
+        if(alreadyinroom){
+            return socket.emit('roomcreatedwithfriend',{
+                success:true,
+                createroom: alreadyRoom,
+                message:"room already exists"
+            });
+        }
+
+        const createroom=await room.create({
+            name:data.friend.name,
+            members:[data.id,data.friend.id],
+            createdBy:data.id
+        })
+        return socket.emit('roomcreatedwithfriend',{
+            createroom,
+            message:`room created with the ${data.friend.name}`
+        })
+            
+        } catch (error) {
+            return socket.emit('roomcreatedwithfriend',error)
+        }
+        
     })
 }
 module.exports=roomsocket
