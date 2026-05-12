@@ -47,7 +47,8 @@ function Home({socket}) {
         })
         socket.on('messagestorage',(data)=>{
             console.log(data);
-            console.log(allroomcontent);
+            setallroomcontent(prev=>[...prev,data.storemessage])
+            // console.log(allroomcontent);
             
         })
        
@@ -88,7 +89,7 @@ function Home({socket}) {
     function addfriend() {
         socket.emit('createroomwiththefriend',{
             id,
-            friend
+            friend:friend
         })
     }
     async function fetchroom(_id)
@@ -145,8 +146,8 @@ function Home({socket}) {
             const data = await oldmessages.json();
 
     console.log(data.content);
-
-        setallroomcontent(prev=>[...prev,data.content]);
+            socket.emit('join-chat-room',_id);
+        setallroomcontent(data.content);
     }
     return ( <div className="h-full w-full bg-black text-white overflow-scroll relative">
         <div className="flex bg-gray-900 w-[80%]] flex-row gap-5 justify-center items-center rounded-2xl m-4 mt-0 h-[20%] ">
@@ -171,7 +172,13 @@ function Home({socket}) {
         {room?.map(data=>{
             return <li className="w-full overflow-hidden h-[10%] shadow-2xl  bg-gray-800 px-5 py-3" onClick={()=>{
                 messagebox(data._id)
-            }} key={data._id}>{data.name}</li>
+            }} key={data._id}>{
+                data?.name?.map(name=>{
+                    if(name!==user)
+                    {
+                        return name
+                    }
+                })}</li>
         })}
         </ul>
         <div className="w-full   bg-gray-600">

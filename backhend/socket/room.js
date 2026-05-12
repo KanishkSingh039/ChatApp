@@ -10,6 +10,7 @@ const roomsocket=(io,socket)=>{
       return;  
     }
         const creatingroom=await room.create({
+            Type:"group",
             name:data.name,
             members:[finduser._id],
             createdBy:finduser._id
@@ -85,31 +86,35 @@ const roomsocket=(io,socket)=>{
         try {
             console.log(data);
         console.log(data.friend);
-        
+        const finduser=await user.findOne({_id:data.id});
         if(!data.id||!data.friend){
             return socket.emit('roomcreatedwithfriend',{
-                message:`check the data which is ${data.id,data.friend}`
+                message:`check the data which is ${data.id} ${data.friend}`
             })
         }
         const alreadyinroom = await room.findOne({
+            Type:"friend",
             members: {
-                $all: [data.id, data.friend.id]
+                $all: [data.id, data.friend._id]
             }
         });
 
         if(alreadyinroom){
             return socket.emit('roomcreatedwithfriend',{
-                success:true,
-                createroom: alreadyRoom,
+                success:false,
+                createroom: alreadyinroom,
                 message:"room already exists"
             });
         }
 
         const createroom=await room.create({
-            name:data.friend.name,
-            members:[data.id,data.friend.id],
+            Type:"friend",
+            name:[data.friend.name,finduser.name],
+            members:[data.id,data.friend._id],
             createdBy:data.id
         })
+        console.log(createroom);
+        
         return socket.emit('roomcreatedwithfriend',{
             createroom,
             message:`room created with the ${data.friend.name}`

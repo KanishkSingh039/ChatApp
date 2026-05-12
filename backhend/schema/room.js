@@ -1,9 +1,13 @@
 const mongoose=require('mongoose');
 const room= new mongoose.Schema({
-    name:{
+    Type:{
         type:String,
         required:true
     },
+    name:[{
+        type:String,
+        required:true
+    }],
     members:[
         {
             type:String
