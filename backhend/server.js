@@ -7,6 +7,7 @@ const connecting=require('./database_config/database');
 const register_login=require('./routes/register-login');
 const chat=require('./routes/chat');
 const room=require('./routes/room');
+const message=require('./routes/message');
 const socketsetup = require('./socket/socket');
 const app=express();
 connecting();
@@ -28,6 +29,7 @@ socketsetup(io);
 app.use(register_login);
 app.use(chat);
 app.use(room);
+app.use(message);
 server.listen(process.env.PORT,()=>{
     console.log("server started");
 })
