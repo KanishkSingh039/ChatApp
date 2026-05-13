@@ -1,5 +1,6 @@
 const user=require('../schema/user');
 const room=require('../schema/room');
+const requestschema=require('../schema/request');
 const { verify } = require('jsonwebtoken');
 const message = require('../schema/message');
 const roomsocket=(io,socket)=>{
@@ -85,17 +86,18 @@ const roomsocket=(io,socket)=>{
     socket.on('createroomwiththefriend',async(data)=>{
         try {
             console.log(data);
-        console.log(data.friend);
-        const finduser=await user.findOne({_id:data.id});
-        if(!data.id||!data.friend){
+        // console.log(data.friend);
+        // const finduser=await user.findOne({_id:data.id});
+        if(!data.senderId||!data.receiverId||!data.senderName||!data.user){
+        // if(!data.id||!data.friend){
             return socket.emit('roomcreatedwithfriend',{
-                message:`check the data which is ${data.id} ${data.friend}`
+                message:`check the data which is ${data.receiverId} ${data.user} ${data.senderId} ${data.senderName}`
             })
         }
         const alreadyinroom = await room.findOne({
             Type:"friend",
             members: {
-                $all: [data.id, data.friend._id]
+                $all: [data.receiverId, data.senderId]
             }
         });
 
@@ -109,15 +111,23 @@ const roomsocket=(io,socket)=>{
 
         const createroom=await room.create({
             Type:"friend",
-            name:[data.friend.name,finduser.name],
-            members:[data.id,data.friend._id],
-            createdBy:data.id
+            name:[data.senderName,data.user],
+            members:[data.receiverId,data.senderId],
+            createdBy:data.senderId
         })
         console.log(createroom);
-        
+        if(createroom)
+        {
+            await requestschema.deleteOne({
+                senderId:data.senderId,
+                receiverId:data.receiverId
+            })
+        }
         return socket.emit('roomcreatedwithfriend',{
-            createroom,
-            message:`room created with the ${data.friend.name}`
+            room:createroom,
+            senderId:data.senderId,
+            receiverId:data.receiverId,
+            message:`room created with the ${data.senderName}`
         })
             
         } catch (error) {

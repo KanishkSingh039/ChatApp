@@ -15,6 +15,8 @@ function Home({socket}) {
  const [message,setmessage]=useState('');
  const [currentroomId,setcurrentroomId]=useState('');
  const[allroomcontent,setallroomcontent]=useState([]);
+ const [request,setrequest]=useState([]);
+ const [request_chat,setrequest_chat]=useState(false);
 
     useEffect(()=>{
         socket.on('roomcreated',(data)=>{
@@ -42,13 +44,22 @@ function Home({socket}) {
             setfriend(data.friend);
         })
         socket.on('roomcreatedwithfriend',(data)=>{
-            console.log(data);
+            console.log(data.senderId);
+            console.log(data.receiverId);
+            
+            setroom(prev=>
+                [...prev,data.room]
+            );
+            setrequest(prev=>prev.filter(req => req.senderId !== data.senderId));
             
         })
         socket.on('messagestorage',(data)=>{
             console.log(data);
             setallroomcontent(prev=>[...prev,data.storemessage])
-            // console.log(allroomcontent);
+            
+        });
+        socket.on('sendrequest-response',(data)=>{
+            console.log(data);
             
         })
        
@@ -57,7 +68,8 @@ function Home({socket}) {
             socket.off('error');
             socket.off('userid')
             socket.off('friendfinded');
-            socket.off('roomcreatedwithfriend')
+            socket.off('roomcreatedwithfriend');
+            socket.off('sendrequest-response')
         }
     },[]);
     useEffect(() => {
@@ -87,9 +99,24 @@ function Home({socket}) {
         })
     }
     function addfriend() {
-        socket.emit('createroomwiththefriend',{
+        socket.emit('sendrequest',{
+            user,
             id,
-            friend:friend
+            friend:friend})
+        
+    }
+    function createroomwithfriend(senderId,receiverId,senderName)
+    {
+        console.log("data :  ",senderId,
+            receiverId,
+            senderName
+        );
+        
+        socket.emit('createroomwiththefriend',{
+            senderId:senderId,
+            receiverId:receiverId,
+            senderName:senderName,
+            user:user
         })
     }
     async function fetchroom(_id)
@@ -128,8 +155,7 @@ function Home({socket}) {
             content:message
         });
         setmessage('');
-        // socket.emit('requestcontent',setallroomcontent);
-        // const data =await fetch('')
+        
     }
     async function messagebox(_id)
     {
@@ -149,6 +175,24 @@ function Home({socket}) {
             socket.emit('join-chat-room',_id);
         setallroomcontent(data.content);
     }
+    async function fetchRequest() {
+        setrequest_chat(!request_chat);
+        const res=await fetch('http://localhost:3456/request',{
+            method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body:JSON.stringify({
+                    id
+                })
+            });
+        const data= await res.json();
+        console.log(data);
+            
+            setrequest(data.content);
+            
+        
+    }
     return ( <div className="h-full w-full bg-black text-white overflow-scroll relative">
         <div className="flex bg-gray-900 w-[80%]] flex-row gap-5 justify-center items-center rounded-2xl m-4 mt-0 h-[20%] ">
         <input className="text-white bg-gray-700 h-8 rounded-xl w-[20%] pl-5" placeholder="Enter the name for the group" type="text" value={name} onChange={(e)=>setname(e.target.value)}/>
@@ -165,7 +209,9 @@ function Home({socket}) {
 
         </div>
         <button className='bg-white text-black px-3 rounded-2xl h-6'  onClick={()=>onfindfriend()}>Search</button>
-
+        <button className='bg-white text-black px-3 rounded-2xl h-6' onClick={()=>{
+            fetchRequest()
+        }}>Requests</button>
         </div>
         <div className="flex flex-row h-screen">
         <ul className="flex flex-col  items-center h-[70%]">
@@ -181,11 +227,10 @@ function Home({socket}) {
                 })}</li>
         })}
         </ul>
-        <div className="w-full   bg-gray-600">
-            {
-                console.log(allroomcontent)
-            }
-            {
+        {
+            request_chat===false&&(
+                <div className="w-full   bg-gray-600">
+                    {
                 
                 
                 allroomcontent?.map(data=>{
@@ -198,6 +243,31 @@ function Home({socket}) {
             <input className="w-[80%] h-[90%]" value={message} onChange={(e)=>setmessage(e.target.value)} placeholder="Enter message" type="text" /> 
             <button className="h-[80%] w-[8%] rounded-4xl bg-white text-black" onClick={()=>sendmessage()}>Send</button></div>
         </div>
+            )
+        }
+        {
+            request_chat===true&&(
+                <div className="w-full   bg-gray-600">
+                    {
+                
+                request?.length!=0&&
+                
+                    request?.map(data=>{
+                        console.log(data);
+                        
+                        return <div className="h-[7%] bg-white text-black w-[20%] gap-2 flex flex-row items-center relative" key={data._id}>
+                            <h1 className="inline">{data.senderName}</h1>
+                            <button className="h-[60%] w-[30%] inline rounded-4xl bg-black text-white" >Reject</button>
+                            <button className="h-[60%] w-[30%] inline rounded-4xl bg-black text-white right-1 absolute" onClick={()=>{createroomwithfriend(data.senderId,data.receiverId,data.senderName)}} >Accept</button>
+                            </div>
+                    })
+
+                
+            }
+        
+        </div>
+            )
+        }
         </div>
         
     </div> );
