@@ -1,8 +1,294 @@
 @import "tailwindcss";
 
-html,body,#root{
+:root {
+  --bg-primary: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-elevated: #111111;
+  --bg-hover: #1a1a1a;
+  --bg-input: #0d0d0d;
+
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-muted: #666666;
+  --text-disabled: #444444;
+
+  --border-primary: #222222;
+  --border-secondary: #333333;
+  --border-focus: #555555;
+
+  --accent: #ffffff;
+  --accent-hover: #e0e0e0;
+  --accent-text: #000000;
+
+  --danger: #ff4444;
+  --danger-bg: rgba(255, 68, 68, 0.1);
+
+  --success: #00cc66;
+  --success-bg: rgba(0, 204, 102, 0.1);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(255, 255, 255, 0.05);
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Selection */
+::selection {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+/* ========================================
+   Keyframe Animations
+   ======================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes messagePop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp var(--transition-normal) ease-out;
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown var(--transition-normal) ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight var(--transition-normal) ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft var(--transition-normal) ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--transition-normal) ease-out;
+}
+
+.animate-message-pop {
+  animation: messagePop 200ms ease-out;
+}
+
+.animate-toast-in {
+  animation: toastSlideIn 300ms ease-out;
+}
+
+.animate-toast-out {
+  animation: toastSlideOut 300ms ease-in forwards;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Typing dots */
+.typing-dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: dotPulse 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: 0ms; }
+.typing-dots span:nth-child(2) { animation-delay: 200ms; }
+.typing-dots span:nth-child(3) { animation-delay: 400ms; }
+
+/* Focus ring */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Glass effect for modals */
+.glass-overlay {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }

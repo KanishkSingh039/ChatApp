@@ -1,7 +1,6 @@
 const express=require('express');
 const authchecker=require('../controller/authchecker');
-const roomfetch=require('../controller/roomfetch') 
+const fetchedmessage=require('../controller/message');
 const router=express.Router();
-
-router.post('/rooms',roomfetch);
+router.post('/message',authchecker,fetchedmessage)
 module.exports=router;

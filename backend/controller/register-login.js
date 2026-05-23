@@ -65,7 +65,6 @@ const login=async(req,res)=>{
             name:verifyuser.name,
             email,
             password:verifypass.password,
-    
         },process.env.SECRET_KEY, { expiresIn: "15m" });
 
         return res.status(200).json({

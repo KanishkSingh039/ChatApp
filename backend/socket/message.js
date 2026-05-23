@@ -11,6 +11,7 @@ const message=(io,socket)=>{
                 console.log('joined room:', roomId);
             });
 
+
         });
         socket.on('sendmessage',async(data)=>{
             const storemessage=await messageschema.create({
@@ -24,6 +25,11 @@ const message=(io,socket)=>{
                 message:"message stored successfull"
             })
         })
+        socket.on('delete-message',async(_id)=>{
+            const findmessageanddelete=await messageschema.findByIdAndDelete({_id});
+            io.to(findmessageanddelete.roomId).emit('update-chatroom',({id:_id}));
+        })
+        
     } catch (error) {
         return socket.emit('messagestorage',{
             message:error.message
