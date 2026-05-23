@@ -79,7 +79,7 @@ export function LoginPage() {
             Welcome back
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Sign in to continue to ChatApp
+            Sign in to continue to Speakify
           </p>
         </div>
 

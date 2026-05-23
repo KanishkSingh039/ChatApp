@@ -88,7 +88,7 @@ export function RegisterPage() {
             Create account
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Join ChatApp and start messaging
+            Join Speakify and start messaging
           </p>
         </div>
 
