@@ -15,7 +15,7 @@ const socketsetup=(io)=>{
         console.log('Total listeners:', socket.eventNames().length);
         console.log('Events:', socket.eventNames());
         socket.on('disconnect', () => {
-        connectedClients.delete(socket.id); // ✅ always clean up
+        connectedClients.delete(socket.id);
         console.log(`Disconnected: ${connectedClients.size} clients`);
         socket.removeAllListeners();
     });
