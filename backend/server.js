@@ -14,7 +14,7 @@ const app=express();
 connecting();
 app.use(cor(
     {
-        origin:"https://speakify.onrender.com",
+        origin:"https://speakify-pg3w.onrender.com",
         methods:["GET","POST"]
     }
 ));
@@ -22,7 +22,7 @@ app.use(express.json());
 const server=http.createServer(app);
 const io=new Server(server,{
     cors:{
-        origin:"https://speakify.onrender.com",
+        origin:"https://speakify-pg3w.onrender.com",
         methods:["GET","POST"]
     }
 });
