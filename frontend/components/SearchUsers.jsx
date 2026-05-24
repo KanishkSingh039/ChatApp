@@ -26,12 +26,7 @@ export function SearchUsers({ onSelectUser, onSendRequest }) {
 
       const handleResult = (data) => {
         if (data.friend) {
-          // Don't show self
-          if (data.friend.uniqueId === auth.user?.uniqueId) {
-            setResults([]);
-          } else {
-            setResults([data.friend]);
-          }
+          setResults([data.friend]);
         } else {
           setResults([]);
         }
@@ -130,7 +125,9 @@ export function SearchUsers({ onSelectUser, onSendRequest }) {
       {/* Results */}
       {results.length > 0 && (
         <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {results.map((user) => (
+          {results.map((user) => {
+            const isSelf = user.uniqueId === auth.user?.uniqueId;
+            return (
             <div
               key={user._id || user.id}
               className="animate-fade-in-up"
@@ -157,34 +154,51 @@ export function SearchUsers({ onSelectUser, onSendRequest }) {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
                   }}
                 >
                   {user.name}
+                  {isSelf && (
+                    <span style={{
+                      fontSize: '0.65rem',
+                      padding: '1px 6px',
+                      background: 'var(--bg-hover)',
+                      borderRadius: 'var(--radius-full)',
+                      color: 'var(--text-muted)',
+                      fontWeight: '500',
+                    }}>
+                      You
+                    </span>
+                  )}
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>@{user.uniqueId}</p>
               </div>
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                {requestSent[user._id] ? (
-                  <span
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: '0.7rem',
-                      color: 'var(--text-muted)',
-                      fontWeight: '500',
-                    }}
-                  >
-                    Sent ✓
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleSendRequest(user)}
-                    className="btn btn-sm btn-primary"
-                    disabled={!auth.user?._id}
-                  >
-                    Add
-                  </button>
+                {!isSelf && (
+                  requestSent[user._id] ? (
+                    <span
+                      style={{
+                        padding: '5px 10px',
+                        fontSize: '0.7rem',
+                        color: 'var(--text-muted)',
+                        fontWeight: '500',
+                      }}
+                    >
+                      Sent ✓
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleSendRequest(user)}
+                      className="btn btn-sm btn-primary"
+                      disabled={!auth.user?._id}
+                    >
+                      Add
+                    </button>
+                  )
                 )}
                 <button
                   onClick={() => onSelectUser && onSelectUser(user)}
@@ -194,7 +208,8 @@ export function SearchUsers({ onSelectUser, onSendRequest }) {
                 </button>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 

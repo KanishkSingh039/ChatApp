@@ -22,6 +22,7 @@ export function MainLayout() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showSearchUsers, setShowSearchUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showOwnProfile, setShowOwnProfile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [requestCount, setRequestCount] = useState(0);
   const [chatroomactive, setchatroomactive] = useState(false);
@@ -229,8 +230,11 @@ export function MainLayout() {
             </div>
           </div>
 
-          {/* User Card */}
+          {/* User Card — clickable to view own profile */}
           <div
+            className="user-card-clickable"
+            onClick={() => setShowOwnProfile(true)}
+            title="View your profile"
             style={{
               padding: '10px 12px',
               background: 'var(--bg-elevated)',
@@ -263,16 +267,21 @@ export function MainLayout() {
                 </p>
               )}
             </div>
-            <div
-              className="status-dot status-online"
-              title="Connected"
-              style={{ flexShrink: 0 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              <div
+                className="status-dot status-online"
+                title="Connected"
+              />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-disabled)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
         <div
+          className={isMobile ? 'mobile-tabs' : ''}
           style={{
             display: 'flex',
             borderBottom: '1px solid var(--border-primary)',
@@ -280,30 +289,32 @@ export function MainLayout() {
           }}
         >
           {[
-            { id: 'chats', label: 'Chats' },
-            { id: 'search', label: 'FindFriends' },
-            { id: 'groups', label: 'FindGroups' },
-            { id: 'requests', label: 'Requests', badge: requestCount },
+            { id: 'chats', label: 'Chats', icon: '💬' },
+            { id: 'search', label: 'Friends', icon: '👤' },
+            { id: 'groups', label: 'Groups', icon: '👥' },
+            { id: 'requests', label: 'Requests', badge: requestCount, icon: '📩' },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
                 flex: 1,
-                padding: '10px 8px',
+                padding: isMobile ? '12px 6px' : '10px 8px',
                 background: 'none',
                 border: 'none',
                 borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
                 color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
                 cursor: 'pointer',
-                fontSize: '0.78rem',
+                fontSize: isMobile ? '0.7rem' : '0.78rem',
                 fontWeight: '600',
                 fontFamily: "'Inter', sans-serif",
                 transition: 'all var(--transition-fast)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '5px',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
               }}
             >
               {tab.label}
@@ -394,7 +405,13 @@ export function MainLayout() {
             roomName={selectedRoom.name || selectedRoom.roomname}
             roomMembers={selectedRoom.members || []}
             sidebarOpen={sidebarOpen}
-            onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+            onToggleSidebar={() => {
+              if (isMobile) {
+                setSidebarOpen(true);
+              } else {
+                setSidebarOpen((prev) => !prev);
+              }
+            }}
           />
         ) : (
           <div
@@ -484,13 +501,99 @@ export function MainLayout() {
 
       {/* ===== MODALS (rendered via Portal to escape overflow:hidden) ===== */}
 
-      {/* User Profile Modal */}
+      {/* User Profile Modal (other users) */}
       {selectedUser && createPortal(
         <UserProfile
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
           onMessage={handleMessageUser}
         />,
+        document.body
+      )}
+
+      {/* Own Profile Modal */}
+      {showOwnProfile && auth.user && createPortal(
+        <div className="modal-overlay animate-fade-in">
+          <div className="modal-backdrop" onClick={() => setShowOwnProfile(false)} />
+          <div className="modal-content" style={{ textAlign: 'center' }}>
+            {/* Close Button */}
+            <button
+              onClick={() => setShowOwnProfile(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '1.1rem',
+                padding: '4px',
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+
+            {/* Avatar */}
+            <div style={{ marginTop: '16px', marginBottom: '20px' }}>
+              <div
+                className="avatar avatar-xl avatar-white"
+                style={{ margin: '0 auto' }}
+              >
+                {auth.user.name?.[0]?.toUpperCase() || '?'}
+              </div>
+            </div>
+
+            {/* Info */}
+            <h2
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: '700',
+                color: 'var(--text-primary)',
+                marginBottom: '4px',
+              }}
+            >
+              {auth.user.name}
+            </h2>
+            {auth.user.uniqueId && (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '4px' }}>
+                @{auth.user.uniqueId}
+              </p>
+            )}
+            {auth.user.email && (
+              <p style={{ color: 'var(--text-disabled)', fontSize: '0.75rem', marginBottom: '8px' }}>
+                {auth.user.email}
+              </p>
+            )}
+
+            {/* Status */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                background: 'var(--success-bg)',
+                borderRadius: 'var(--radius-full)',
+                marginBottom: '24px',
+              }}
+            >
+              <div className="status-dot status-online" style={{ border: 'none' }} />
+              <span style={{ color: 'var(--success)', fontSize: '0.75rem', fontWeight: '600' }}>Online</span>
+            </div>
+
+            {/* Close Action */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={() => setShowOwnProfile(false)}
+                className="btn btn-secondary btn-full"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
 
