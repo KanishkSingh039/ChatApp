@@ -304,11 +304,12 @@ body {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
+    width: 85vw !important;
+    min-width: 85vw !important;
+    max-width: 85vw !important;
     z-index: 40;
     transition: transform var(--transition-normal), opacity var(--transition-normal) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
   }
 
   .sidebar-mobile.sidebar-open {
@@ -332,9 +333,54 @@ body {
   .modal-overlay {
     z-index: 60 !important;
   }
+
+  /* Mobile tab navigation: smaller text, scroll if needed */
+  .mobile-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Bigger touch targets on mobile */
+  .btn {
+    min-height: 44px;
+  }
+  .btn-sm {
+    min-height: 36px;
+  }
+
+  /* Prevent overscroll bounce */
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/* Very small screens (< 380px) */
+@media (max-width: 380px) {
+  .sidebar-mobile {
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+  }
 }
 
 /* Ensure modal is always above everything on all sizes */
 .modal-overlay {
   z-index: 50;
+}
+
+/* Clickable user card */
+.user-card-clickable {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.user-card-clickable:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-secondary) !important;
+}
+.user-card-clickable:active {
+  transform: scale(0.98);
 }
