@@ -292,3 +292,49 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* ========================================
+   Mobile Responsive Styles
+   ======================================== */
+
+/* Sidebar overlay on mobile */
+@media (max-width: 768px) {
+  .sidebar-mobile {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    z-index: 40;
+    transition: transform var(--transition-normal), opacity var(--transition-normal) !important;
+  }
+
+  .sidebar-mobile.sidebar-open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-mobile.sidebar-closed {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Show close button on mobile */
+  .sidebar-close-btn-mobile {
+    display: flex !important;
+  }
+
+  /* Ensure modals appear above sidebar */
+  .modal-overlay {
+    z-index: 60 !important;
+  }
+}
+
+/* Ensure modal is always above everything on all sizes */
+.modal-overlay {
+  z-index: 50;
+}

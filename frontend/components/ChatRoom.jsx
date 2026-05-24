@@ -12,8 +12,16 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onTo
   const [loading, setLoading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Get display name for room
   const displayName = (() => {
@@ -178,10 +186,10 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onTo
           gap: '12px',
         }}
       >
-        {/* Hamburger Menu Toggle */}
+        {/* Hamburger Menu Toggle — always visible on mobile */}
         <button
           onClick={onToggleSidebar}
-          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          title={isMobile ? 'Open sidebar' : (sidebarOpen ? 'Close sidebar' : 'Open sidebar')}
           style={{
             background: 'none',
             border: 'none',

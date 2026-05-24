@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
@@ -25,6 +26,24 @@ export function MainLayout() {
   const [requestCount, setRequestCount] = useState(0);
   const [chatroomactive, setchatroomactive] = useState(false);
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'search' | 'requests'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // On mobile, start with sidebar open (so user sees chats first)
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(true);
+    }
+  }, []);
 
   // Handle room creation from socket
   useEffect(() => {
@@ -67,7 +86,10 @@ export function MainLayout() {
 
   const handleSelectRoom = (room) => {
     setSelectedRoom(room);
-    setSidebarOpen(false);
+    // On mobile, always close sidebar when a room is selected
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   };
 
   const handleSelectUser = (user) => {
@@ -92,18 +114,35 @@ export function MainLayout() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', overflow: 'hidden', background: 'var(--bg-primary)' }}>
+    <div style={{ height: '100vh', display: 'flex', overflow: 'hidden', background: 'var(--bg-primary)', position: 'relative' }}>
+      {/* ===== MOBILE SIDEBAR BACKDROP ===== */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 35,
+            animation: 'fadeIn var(--transition-fast) ease-out',
+          }}
+        />
+      )}
+
       {/* ===== SIDEBAR ===== */}
       <div
+        className={isMobile ? `sidebar-mobile ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}` : ''}
         style={{
-          width: sidebarOpen ? '340px' : '0',
-          minWidth: sidebarOpen ? '340px' : '0',
+          ...(!isMobile ? {
+            width: sidebarOpen ? '340px' : '0',
+            minWidth: sidebarOpen ? '340px' : '0',
+            overflow: 'hidden',
+            transition: 'all var(--transition-normal)',
+          } : {}),
           background: 'var(--bg-surface)',
           borderRight: '1px solid var(--border-primary)',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'all var(--transition-normal)',
-          overflow: 'hidden',
         }}
       >
         {/* Sidebar Header */}
@@ -156,20 +195,37 @@ export function MainLayout() {
               </button>
 
               {/* Mobile close */}
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="md:hidden"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '6px',
-                  display: 'none',
-                }}
-              >
-                ✕
-              </button>
+              {isMobile && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="sidebar-close-btn-mobile"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    borderRadius: 'var(--radius-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'none';
+                    e.currentTarget.style.color = 'var(--text-muted)';
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
 
@@ -330,7 +386,7 @@ export function MainLayout() {
       </div>
 
       {/* ===== MAIN CHAT AREA ===== */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' }}>
         {/* Chat or Empty State */}
         {selectedRoom ? (
           <ChatRoom
@@ -350,8 +406,8 @@ export function MainLayout() {
               background: 'var(--bg-primary)',
             }}
           >
-            {/* Header with hamburger when sidebar is closed */}
-            {!sidebarOpen && (
+            {/* Header with hamburger — always show on mobile, or when sidebar is closed on desktop */}
+            {(isMobile || !sidebarOpen) && (
               <div
                 style={{
                   padding: '14px 20px',
@@ -391,7 +447,7 @@ export function MainLayout() {
                   </svg>
                 </button>
                 <h2 style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.9rem' }}>
-                  ChatApp
+                  Speakify
                 </h2>
               </div>
             )}
@@ -426,25 +482,29 @@ export function MainLayout() {
         )}
       </div>
 
-      {/* ===== MODALS ===== */}
+      {/* ===== MODALS (rendered via Portal to escape overflow:hidden) ===== */}
 
       {/* User Profile Modal */}
-      {selectedUser && (
+      {selectedUser && createPortal(
         <UserProfile
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
           onMessage={handleMessageUser}
-        />
+        />,
+        document.body
       )}
 
       {/* Create Group Modal */}
-      <CreateGroup
-        isOpen={showCreateGroup}
-        onClose={() => setShowCreateGroup(false)}
-        onCreated={(room) => {
-          setSelectedRoom(room);
-        }}
-      />
+      {createPortal(
+        <CreateGroup
+          isOpen={showCreateGroup}
+          onClose={() => setShowCreateGroup(false)}
+          onCreated={(room) => {
+            setSelectedRoom(room);
+          }}
+        />,
+        document.body
+      )}
     </div>
   );
 }
