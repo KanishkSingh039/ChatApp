@@ -4,7 +4,7 @@ import { useSocket } from '../hooks/useSocket';
 import { SOCKET_EVENTS } from '../utils/config';
 import { api } from '../utils/api';
 
-export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onToggleSidebar }) {
+export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebarOpen, onToggleSidebar }) {
   const auth = useAuth();
   const { socket } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -252,7 +252,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onTo
           </h2>
           {roomMembers.length > 0 && (
             <p style={{ color: 'var(--text-disabled)', fontSize: '0.7rem', marginTop: '2px' }}>
-              {roomMembers.length} member{roomMembers.length !== 1 ? 's' : ''}
+              {roomType==='friend'?'Direct message':`${roomMembers.length} member${roomMembers.length !== 1 ? 's' : ''}`}
             </p>
           )}
         </div>

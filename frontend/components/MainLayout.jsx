@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState} from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -50,15 +50,6 @@ export function MainLayout() {
   useEffect(() => {
     if (!socket) return;
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-
-    // if (token) {
-    //   const decoded = jwtDecode(token);
-
-    //   if (decoded.exp * 1000 < Date.now()) {
-    //       localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    //       navigate('/login');
-    //   }
-    // }
 
     const handleRoomCreated = (data) => {
       if (data.roomId || data._id) {
@@ -404,6 +395,7 @@ export function MainLayout() {
             roomId={selectedRoom._id || selectedRoom.roomId || selectedRoom.id}
             roomName={selectedRoom.name || selectedRoom.roomname}
             roomMembers={selectedRoom.members || []}
+            roomtype={selectedRoom.type}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => {
               if (isMobile) {
