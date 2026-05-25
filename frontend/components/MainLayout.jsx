@@ -115,7 +115,7 @@ export function MainLayout() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', overflow: 'hidden', background: 'var(--bg-primary)', position: 'relative' }}>
+    <div style={{ height: '100dvh', display: 'flex', overflow: 'hidden', background: 'var(--bg-primary)', position: 'relative' }}>
       {/* ===== MOBILE SIDEBAR BACKDROP ===== */}
       {isMobile && sidebarOpen && (
         <div
@@ -397,7 +397,7 @@ export function MainLayout() {
       </div>
 
       {/* ===== MAIN CHAT AREA ===== */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%', overflow: 'hidden' }}>
         {/* Chat or Empty State */}
         {selectedRoom ? (
           <ChatRoom

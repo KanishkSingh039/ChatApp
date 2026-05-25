@@ -23,6 +23,26 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onTo
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Handle virtual keyboard on mobile — keep layout within visible viewport
+  const containerRef = useRef(null);
+  useEffect(() => {
+    if (!isMobile || !window.visualViewport) return;
+
+    const handleViewportResize = () => {
+      if (containerRef.current) {
+        containerRef.current.style.height = `${window.visualViewport.height}px`;
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleViewportResize);
+    window.visualViewport.addEventListener('scroll', handleViewportResize);
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', handleViewportResize);
+      window.visualViewport.removeEventListener('scroll', handleViewportResize);
+    };
+  }, [isMobile]);
+
   // Get display name for room
   const displayName = (() => {
     if (Array.isArray(roomName)) {
@@ -174,7 +194,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], sidebarOpen, onTo
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
       {/* Header */}
       <div
         style={{
