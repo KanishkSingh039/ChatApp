@@ -8,6 +8,14 @@ const message=new mongoose.Schema({
         type:String,
         required:true,
     },
+    public_id:{
+        type:String,
+    },
+    category:{
+        type:String,
+        default:'text',
+        required:true
+    },
     content:{
         type:String,
         required:true

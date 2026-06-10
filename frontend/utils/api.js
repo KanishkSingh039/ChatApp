@@ -1,5 +1,4 @@
 import { API_BASE_URL, ENDPOINTS, STORAGE_KEYS } from './config';
-
 // Helper to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
@@ -93,6 +92,43 @@ export const api = {
     });
     return handleResponse(response);
   },
+  uploadatcloudinary:async(file)=>{
+    const formData=new FormData();
+    const ext = file.name.split('.').pop().toLowerCase();
+
+      const documentExtensions = [
+        'pdf', 'doc', 'docx',
+        'xls', 'xlsx',
+        'ppt', 'pptx',
+        'txt', 'zip'
+      ];
+      if(documentExtensions.includes(ext))
+      {
+        formData.append("raw",file);
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const upload=await fetch(`${API_BASE_URL}${ENDPOINTS.UPLOADFILE}`,{
+        method: 'POST',
+        headers:{
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body:formData
+          })
+          return handleResponse(upload);
+
+      }
+      else{
+            formData.append("image",file);
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const upload=await fetch(`${API_BASE_URL}${ENDPOINTS.UPLOADIMAGE}`,{
+        method: 'POST',
+        headers:{
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body:formData
+          })
+          return handleResponse(upload);
+      }
+  }
 };
 
 export default api;

@@ -1,6 +1,10 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://speakify-backend-okax.onrender.com';
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://speakify-backend-okax.onrender.com';
+// export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://speakify-backend-okax.onrender.com';
+// export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://speakify-backend-okax.onrender.com';
+
+export const API_BASE_URL = 'http://localhost:3456';
+export const SOCKET_URL = 'http://localhost:3456';
+
 
 // API Endpoints
 export const ENDPOINTS = {
@@ -10,6 +14,8 @@ export const ENDPOINTS = {
   ROOMS: '/rooms',
   MESSAGE: '/message',
   REQUEST: '/request',
+  UPLOADIMAGE:'/uploadimage',
+  UPLOADFILE:'/uploadfile'
 };
 
 // Socket Events

@@ -9,20 +9,30 @@ const chat=require('./routes/chat');
 const room=require('./routes/room');
 const message=require('./routes/message');
 const request=require('./routes/request');
+const imageuploader=require('./routes/imageuploader');
 const socketsetup = require('./socket/socket');
 const app=express();
 connecting();
+
+app.use(express.urlencoded({
+    extended: true,
+    limit: "50mb"
+}));
 app.use(cor(
     {
-        origin:"https://speakify-pg3w.onrender.com",
+        origin:["http://localhost:5173"],
+        // origin:["http://localhost:5173","https://speakify-pg3w.onrender.com"],
         methods:["GET","POST"]
     }
 ));
-app.use(express.json());
+app.use(express.json({
+    limit: "50mb"
+}));
 const server=http.createServer(app);
 const io=new Server(server,{
     cors:{
-        origin:"https://speakify-pg3w.onrender.com",
+        origin:["http://localhost:5173"],
+        // origin:["http://localhost:5173","https://speakify-pg3w.onrender.com"],
         methods:["GET","POST"]
     }
 });
@@ -31,7 +41,8 @@ app.use(register_login);
 app.use(chat);
 app.use(room);
 app.use(message);
-app.use(request)
+app.use(request);
+app.use(imageuploader);
 server.listen(process.env.PORT,()=>{
     console.log("server started");
 })

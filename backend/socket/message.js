@@ -14,11 +14,24 @@ const message=(io,socket)=>{
 
         });
         socket.on('sendmessage',async(data)=>{
-            const storemessage=await messageschema.create({
-                roomId:data.roomId,
-                senderId:data.senderId,
-                content:data.content
-            })
+            let storemessage;
+            if(data.category==='file'){
+                 storemessage=await messageschema.create({
+                    roomId:data.roomId,
+                    senderId:data.senderId,
+                    content:data.url,
+                    category:data.category
+                })
+            }
+            else{
+                 storemessage=await messageschema.create({
+                    roomId:data.roomId,
+                    senderId:data.senderId,
+                    content:data.content,
+                    category:'text'
+                })
+
+            }
             
             io.to(data.roomId).emit('messagestorage',{
                 storemessage,
