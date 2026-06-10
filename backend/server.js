@@ -20,8 +20,7 @@ app.use(express.urlencoded({
 }));
 app.use(cor(
     {
-        origin:["http://localhost:5173"],
-        // origin:["http://localhost:5173","https://speakify-pg3w.onrender.com"],
+        origin:"https://speakify-pg3w.onrender.com",
         methods:["GET","POST"]
     }
 ));
@@ -31,8 +30,7 @@ app.use(express.json({
 const server=http.createServer(app);
 const io=new Server(server,{
     cors:{
-        origin:["http://localhost:5173"],
-        // origin:["http://localhost:5173","https://speakify-pg3w.onrender.com"],
+        origin:"https://speakify-pg3w.onrender.com",
         methods:["GET","POST"]
     }
 });
