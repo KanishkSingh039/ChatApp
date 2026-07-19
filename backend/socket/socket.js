@@ -2,6 +2,7 @@ const chatsocket=require('./chatsocket');
 const message = require('./message');
 const requestsocket = require('./request');
 const roomsocket=require('./room');
+const call=require('./call');
 const connectedClients = new Map();
 
 const socketsetup=(io)=>{
@@ -11,6 +12,7 @@ const socketsetup=(io)=>{
         chatsocket(io,socket);
         roomsocket(io,socket);
         message(io,socket);
+        call(io,socket);
         requestsocket(io,socket);
         console.log('Total listeners:', socket.eventNames().length);
         console.log('Events:', socket.eventNames());

@@ -11,12 +11,14 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
+    "dotenv": "^17.4.2",
     "jwt-decode": "^4.0.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
     "socket.io-client": "^4.8.3",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "webrtc": "^1.14.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

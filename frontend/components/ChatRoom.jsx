@@ -4,8 +4,10 @@ import { useSocket } from '../hooks/useSocket';
 import { SOCKET_EVENTS } from '../utils/config';
 import { api } from '../utils/api';
 
-export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebarOpen, onToggleSidebar }) {
+export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtype, Type, type, sidebarOpen, onToggleSidebar }) {
   const auth = useAuth();
+  const rawType = (roomType || roomtype || Type || type || '').toLowerCase();
+  const isFriendRoom = rawType === 'friend';
   const { socket } = useSocket();
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
@@ -19,9 +21,191 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
   const [lightboxUrl, setLightboxUrl] = useState(null);
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState(null); // { x, y, msgId }
+  const pendingCandidates = useRef([]);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [receivedOffer, setReceivedOffer] = useState(null);
+  const [receivingCall, setReceivingCall] = useState(false);
+  const [callAccepted, setCallAccepted] = useState(false);
+  const [callingOutgoing, setCallingOutgoing] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const pc = useRef(null);
+  const remoteAudioRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
+  useEffect(() => {
+
+    pc.current = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.relay.metered.ca:80",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: "e99870728f0ca2813222e012",
+          credential: "8tssdcmlX3N3S1VZ",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80?transport=tcp",
+          username: "e99870728f0ca2813222e012",
+          credential: "8tssdcmlX3N3S1VZ",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "e99870728f0ca2813222e012",
+          credential: "8tssdcmlX3N3S1VZ",
+        },
+        {
+          urls: "turns:global.relay.metered.ca:443?transport=tcp",
+          username: "e99870728f0ca2813222e012",
+          credential: "8tssdcmlX3N3S1VZ",
+        },
+      ],
+    }
+    );
+    socket.on("offer-read", async (offer) => {
+      setReceivedOffer(offer);
+      setReceivingCall(true);
+      for (const candidate of pendingCandidates.current) {
+        await pc.current.addIceCandidate(
+          new RTCIceCandidate(candidate)
+        );
+      }
+      pendingCandidates.current = [];
+    });
+    socket.on("answer-read", async (answer) => {
+      await pc.current.setRemoteDescription(new RTCSessionDescription(answer));
+      setCallAccepted(true);
+      setCallingOutgoing(false);
+    });
+    socket.on("ice-candidate-read", async (candidate) => {
+      try {
+        if (!pc.current.remoteDescription) {
+          pendingCandidates.current.push(candidate);
+        }
+        else {
+          console.log("Adding received ice candidate", candidate);
+          await pc.current.addIceCandidate(
+            new RTCIceCandidate(candidate));
+
+        }
+      } catch (e) {
+        console.error("Error adding received ice candidate", e);
+      }
+    });
+    pc.current.ontrack = (event) => {
+      console.log("track recieved");
+
+      console.log(event);
+      console.log("Received remote track :", event.streams[0]);
+      setRemoteStream(event.streams[0]);
+    }
+    return () => {
+      socket.off("offer-read");
+      socket.off("answer-read");
+      socket.off("ice-candidate-read");
+      pc.current.close();
+    };
+  }, []);
+
+  async function handleOffer(offer) {
+    console.log("Handling answering");
+    const stream = await navigator.mediaDevices.getUserMedia(
+      {
+        audio: true,
+      }
+    )
+    stream.getTracks().forEach((track) => {
+      pc.current.addTrack(track, stream);
+    })
+    await pc.current.setRemoteDescription(new RTCSessionDescription(offer));
+    for (const candidate of pendingCandidates.current) {
+      await pc.current.addIceCandidate(
+        new RTCIceCandidate(candidate)
+      );
+    }
+    pendingCandidates.current = [];
+    const answer = await pc.current.createAnswer();
+    await pc.current.setLocalDescription(answer);
+    socket.emit("answer", { roomId, answer });
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("reciever ice candidate", event.candidate);
+        socket.emit("ice-candidate", { roomId, candidate: event.candidate });
+      }
+    }
+  }
+
+  // Call duration timer
+  useEffect(() => {
+    let interval;
+    if (callAccepted) {
+      setCallDuration(0);
+      interval = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(interval);
+  }, [callAccepted]);
+
+  // Play remote audio stream when tracks are received
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStream) {
+      console.log("Setting remote audio element stream source:", remoteStream);
+      remoteAudioRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  // Hook UI answer button click to handleOffer
+  const handleAnswerCall = async () => {
+    if (!receivedOffer) return;
+    setCallAccepted(true);
+    setReceivingCall(false);
+    await handleOffer(receivedOffer);
+  };
+
+  // Hook UI call button click to createCallOffer
+  const handleStartCall = async () => {
+    setCallingOutgoing(true);
+    await createCallOffer();
+  };
+
+  // Toggle microphone track mute status
+  const toggleMute = () => {
+    if (pc.current) {
+      pc.current.getSenders().forEach((sender) => {
+        if (sender.track && sender.track.kind === 'audio') {
+          sender.track.enabled = !sender.track.enabled;
+        }
+      });
+      setIsMuted((prev) => !prev);
+    }
+  };
+
+  // Hangup / cancel call
+  const endCall = () => {
+    if (pc.current) {
+      pc.current.getSenders().forEach((sender) => {
+        if (sender.track) {
+          sender.track.stop();
+        }
+      });
+    }
+    setCallAccepted(false);
+    setReceivingCall(false);
+    setCallingOutgoing(false);
+    setIsMuted(false);
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
 
   // Detect mobile viewport
   useEffect(() => {
@@ -108,7 +292,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
 
     // Listen for new messages — backend emits { storemessage, message }
     const handleNewMessage = (data) => {
-      
+
       const newMsg = data.storemessage || data.message || data;
       setMessages((prev) => {
         // Deduplicate by _id
@@ -159,7 +343,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
 
     // Encode the original filename into the URL so we can display it in chat
     const fileUrl = uploadatcloudinary.url + '?fn=' + encodeURIComponent(file.name);
-    
+
     socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
       category: 'file',
       url: fileUrl,
@@ -444,7 +628,24 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
       msgId,
     });
   }, []);
-
+  const createCallOffer = async () => {
+    console.log("creating call offer");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log("Stream", stream);
+    stream.getTracks().forEach(track => {
+      pc.current.addTrack(track, stream);
+    })
+    const offer = await pc.current.createOffer();
+    console.log("offer", offer);
+    await pc.current.setLocalDescription(offer);
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("caller ice candidate", event.candidate);
+        socket.emit("ice-candidate", { roomId, candidate: event.candidate });
+      }
+    }
+    socket.emit("offer", { roomId, offer });
+  }
   return (
     <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
       {/* Header */}
@@ -491,7 +692,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
         <div className="avatar avatar-md avatar-white">
           {displayName?.[0]?.toUpperCase() || '?'}
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2
             style={{
               fontSize: '0.95rem',
@@ -504,10 +705,73 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
           </h2>
           {roomMembers.length > 0 && (
             <p style={{ color: 'var(--text-disabled)', fontSize: '0.7rem', marginTop: '2px' }}>
-              {roomType === 'friend' ? 'Direct message' : `${roomMembers.length} member${roomMembers.length !== 1 ? 's' : ''}`}
+              {isFriendRoom ? 'Direct message' : `${roomMembers.length} member${roomMembers.length !== 1 ? 's' : ''}`}
             </p>
           )}
         </div>
+        {isFriendRoom && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '4px' }}>
+            {/* Audio Call Button */}
+            <button
+              title="Audio Call"
+              onClick={handleStartCall}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all var(--transition-fast)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'none';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+            </button>
+
+            {/* Video Call Button */}
+            <button
+              title="Video Call"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all var(--transition-fast)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--bg-hover)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'none';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 7l-7 5 7 5V7z" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Messages Container */}
@@ -907,6 +1171,301 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, sidebar
           </form>
         </div>
       </div>
+
+      {/* Hidden audio element to play remote stream */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+
+      {/* Call Overlays */}
+      {(receivingCall || callingOutgoing || callAccepted) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(10, 10, 10, 0.9)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            color: '#ffffff',
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes pulseRingGreen {
+              0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+              70% { box-shadow: 0 0 0 24px rgba(16, 185, 129, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+            }
+            @keyframes pulseRingBlue {
+              0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+              70% { box-shadow: 0 0 0 24px rgba(59, 130, 246, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            }
+            @keyframes voiceBar {
+              0%, 100% { transform: scaleY(0.25); }
+              50% { transform: scaleY(1); }
+            }
+            .pulse-green {
+              animation: pulseRingGreen 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            }
+            .pulse-blue {
+              animation: pulseRingBlue 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            }
+            .voice-wave-bar {
+              width: 4px;
+              height: 24px;
+              background-color: var(--success, #00cc66);
+              border-radius: 2px;
+              transform-origin: bottom;
+              animation: voiceBar 1.2s ease-in-out infinite;
+            }
+            .voice-wave-bar:nth-child(1) { animation-delay: 0.1s; }
+            .voice-wave-bar:nth-child(2) { animation-delay: 0.3s; }
+            .voice-wave-bar:nth-child(3) { animation-delay: 0.5s; height: 32px; }
+            .voice-wave-bar:nth-child(4) { animation-delay: 0.2s; }
+            .voice-wave-bar:nth-child(5) { animation-delay: 0.4s; }
+          `}</style>
+
+          {/* Avatar Container */}
+          <div style={{ position: 'relative', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div
+              className={`avatar avatar-lg ${(receivingCall && !callAccepted) ? 'pulse-green' : (callingOutgoing && !callAccepted) ? 'pulse-blue' : ''}`}
+              style={{
+                width: '96px',
+                height: '96px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1f1f1f, #2d2d2d)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '2.5rem',
+                fontWeight: '700',
+                color: '#ffffff',
+                border: `3px solid ${
+                  (receivingCall && !callAccepted)
+                    ? 'var(--success, #00cc66)'
+                    : (callingOutgoing && !callAccepted)
+                    ? 'var(--accent-primary, #3b82f6)'
+                    : 'var(--text-secondary, #a8a29e)'
+                }`,
+                boxShadow: 'var(--shadow-lg)',
+              }}
+            >
+              {displayName?.[0]?.toUpperCase() || '?'}
+            </div>
+          </div>
+
+          {/* Calling Details */}
+          <div style={{ textAlign: 'center', marginBottom: '48px', zIndex: 1 }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: '700', margin: '0 0 8px 0', letterSpacing: '-0.025em' }}>
+              {displayName}
+            </h3>
+            <p style={{ color: 'var(--text-secondary, #b3b3b3)', fontSize: '0.9rem', margin: 0, fontWeight: '500' }}>
+              {(receivingCall && !callAccepted) && 'Incoming Audio Call...'}
+              {(callingOutgoing && !callAccepted) && 'Calling...'}
+              {callAccepted && 'Active Call'}
+            </p>
+
+            {/* Call Timer & Audio Wave for Active Calls */}
+            {callAccepted && (
+              <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                <div
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    padding: '6px 16px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    fontSize: '1rem',
+                    fontFamily: 'monospace',
+                    fontWeight: '600',
+                    letterSpacing: '0.05em',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  {formatDuration(callDuration)}
+                </div>
+
+                {/* Animated Wave */}
+                <div style={{ display: 'flex', gap: '6px', height: '32px', alignItems: 'flex-end', marginTop: '8px' }}>
+                  <div className="voice-wave-bar" />
+                  <div className="voice-wave-bar" />
+                  <div className="voice-wave-bar" />
+                  <div className="voice-wave-bar" />
+                  <div className="voice-wave-bar" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons Bar */}
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center', zIndex: 1 }}>
+            {(receivingCall && !callAccepted) && (
+              <>
+                {/* Decline Button */}
+                <button
+                  onClick={endCall}
+                  title="Decline"
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'var(--danger, #ff4444)',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)',
+                    transition: 'transform var(--transition-fast, 150ms)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                    <line x1="23" y1="1" x2="1" y2="23" />
+                  </svg>
+                </button>
+
+                {/* Answer Button */}
+                <button
+                  onClick={handleAnswerCall}
+                  title="Answer"
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'var(--success, #00cc66)',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+                    transition: 'transform var(--transition-fast, 150ms)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            {(callingOutgoing && !callAccepted) && (
+              /* Cancel Button */
+              <button
+                onClick={endCall}
+                title="Cancel Call"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: 'var(--danger, #ff4444)',
+                  border: 'none',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)',
+                  transition: 'transform var(--transition-fast, 150ms)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                  <line x1="23" y1="1" x2="1" y2="23" />
+                </svg>
+              </button>
+            )}
+
+            {callAccepted && (
+              <>
+                {/* Mute Button */}
+                <button
+                  onClick={toggleMute}
+                  title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: isMuted ? 'var(--danger, #ff4444)' : 'rgba(255, 255, 255, 0.1)',
+                    border: isMuted ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: isMuted ? '0 8px 24px rgba(239, 68, 68, 0.4)' : 'none',
+                    transition: 'all var(--transition-fast, 150ms)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; if (!isMuted) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; if (!isMuted) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
+                >
+                  {isMuted ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                      <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                      <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* End Call Button */}
+                <button
+                  onClick={endCall}
+                  title="End Call"
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'var(--danger, #ff4444)',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)',
+                    transition: 'transform var(--transition-fast, 150ms)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

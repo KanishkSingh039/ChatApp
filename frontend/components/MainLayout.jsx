@@ -395,7 +395,7 @@ export function MainLayout() {
             roomId={selectedRoom._id || selectedRoom.roomId || selectedRoom.id}
             roomName={selectedRoom.name || selectedRoom.roomname}
             roomMembers={selectedRoom.members || []}
-            roomtype={selectedRoom.type}
+            roomType={selectedRoom.Type || selectedRoom.type}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => {
               if (isMobile) {
