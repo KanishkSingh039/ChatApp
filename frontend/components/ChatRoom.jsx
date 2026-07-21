@@ -29,6 +29,9 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const [callingOutgoing, setCallingOutgoing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [CallType,setCallType] = useState(null);  
+  const remotevideoRef = useRef(null);
+  const localvideoRef = useRef(null);
   const pc = useRef(null);
   const remoteAudioRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -94,12 +97,25 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
         console.error("Error adding received ice candidate", e);
       }
     });
+    socket.on("call-type-read",(type)=>{
+      console.log("Recieved call type",type);
+      setCallType(type);
+    })
     pc.current.ontrack = (event) => {
-      console.log("track recieved");
+      if(CallType=="video"){
+        console.log("track recieved");
 
-      console.log(event);
-      console.log("Received remote track :", event.streams[0]);
-      setRemoteStream(event.streams[0]);
+        console.log(event);
+        console.log("Received remote track :", event.streams[0]);
+        setRemoteStream(event.streams[0]);
+      }else if(CallType=="audio"){
+        console.log("track recieved");
+
+        console.log(event);
+        console.log("Received remote track :", event.streams[0]);
+        setRemoteStream(event.streams[0]);
+      }
+      
     }
     return () => {
       socket.off("offer-read");
@@ -111,14 +127,29 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
 
   async function handleOffer(offer) {
     console.log("Handling answering");
-    const stream = await navigator.mediaDevices.getUserMedia(
-      {
-        audio: true,
+    let stream;
+    if(CallType=="video"){
+      stream = await navigator.mediaDevices.getUserMedia(
+        {
+          audio: true,
+          video: true,
+        }
+      );
+      if (localvideoRef.current) {
+        localvideoRef.current.srcObject = stream;
       }
-    )
-    stream.getTracks().forEach((track) => {
-      pc.current.addTrack(track, stream);
-    })
+    }else if(CallType=="audio" || !CallType){
+      stream = await navigator.mediaDevices.getUserMedia(
+        {
+          audio: true,
+        }
+      );
+    }
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        pc.current.addTrack(track, stream);
+      });
+    }
     await pc.current.setRemoteDescription(new RTCSessionDescription(offer));
     for (const candidate of pendingCandidates.current) {
       await pc.current.addIceCandidate(
@@ -153,24 +184,37 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
 
   // Play remote audio stream when tracks are received
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
-      console.log("Setting remote audio element stream source:", remoteStream);
-      remoteAudioRef.current.srcObject = remoteStream;
+    if (remoteStream) {
+      if(CallType=="audio"){
+        if (remoteAudioRef.current) {
+          console.log("Setting remote audio element stream source:", remoteStream);
+          remoteAudioRef.current.srcObject = remoteStream;
+        }
+      }else if(CallType=="video"){
+        if (remotevideoRef.current) {
+          console.log("Setting remote video element stream source:", remoteStream);
+          remotevideoRef.current.srcObject = remoteStream;
+        }
+      }
     }
-  }, [remoteStream]);
+  }, [remoteStream, CallType]);
 
   // Hook UI answer button click to handleOffer
   const handleAnswerCall = async () => {
     if (!receivedOffer) return;
     setCallAccepted(true);
+    socket.emit("call-type", { roomId, callType: CallType });
     setReceivingCall(false);
     await handleOffer(receivedOffer);
   };
 
   // Hook UI call button click to createCallOffer
-  const handleStartCall = async () => {
+  const handleStartCall = async (type) => {
+    const actualType = (type === 'audio' || type === 'video') ? type : 'audio';
+    setCallType(actualType);
     setCallingOutgoing(true);
-    await createCallOffer();
+    socket.emit("call-type", { roomId, callType: actualType });
+    await createCallOffer(actualType);
   };
 
   // Toggle microphone track mute status
@@ -194,6 +238,13 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
         }
       });
     }
+    if (localvideoRef.current) {
+      localvideoRef.current.srcObject = null;
+    }
+    if (remotevideoRef.current) {
+      remotevideoRef.current.srcObject = null;
+    }
+    setCallType(null);
     setCallAccepted(false);
     setReceivingCall(false);
     setCallingOutgoing(false);
@@ -628,10 +679,17 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
       msgId,
     });
   }, []);
-  const createCallOffer = async () => {
-    console.log("creating call offer");
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const createCallOffer = async (actualType) => {
+    console.log("creating call offer", actualType);
+    const isVideo = actualType === 'video';
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: isVideo
+    });
     console.log("Stream", stream);
+    if (isVideo && localvideoRef.current) {
+      localvideoRef.current.srcObject = stream;
+    }
     stream.getTracks().forEach(track => {
       pc.current.addTrack(track, stream);
     })
@@ -714,7 +772,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             {/* Audio Call Button */}
             <button
               title="Audio Call"
-              onClick={handleStartCall}
+              onClick={() => handleStartCall('audio')}
               style={{
                 background: 'none',
                 border: 'none',
@@ -744,6 +802,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             {/* Video Call Button */}
             <button
               title="Video Call"
+              onClick={() => handleStartCall('video')}
               style={{
                 background: 'none',
                 border: 'none',
@@ -1184,9 +1243,9 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(10, 10, 10, 0.9)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
+            background: (CallType === 'video' && callAccepted) ? 'rgba(0, 0, 0, 0.2)' : 'rgba(10, 10, 10, 0.9)',
+            backdropFilter: (CallType === 'video' && callAccepted) ? 'none' : 'blur(24px)',
+            WebkitBackdropFilter: (CallType === 'video' && callAccepted) ? 'none' : 'blur(24px)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -1195,6 +1254,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             color: '#ffffff',
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            overflow: 'hidden',
           }}
         >
           <style>{`
@@ -1237,49 +1297,134 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             .voice-wave-bar:nth-child(5) { animation-delay: 0.4s; }
           `}</style>
 
-          {/* Avatar Container */}
-          <div style={{ position: 'relative', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div
-              className={`avatar avatar-lg ${(receivingCall && !callAccepted) ? 'pulse-green' : (callingOutgoing && !callAccepted) ? 'pulse-blue' : ''}`}
-              style={{
-                width: '96px',
-                height: '96px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1f1f1f, #2d2d2d)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.5rem',
-                fontWeight: '700',
-                color: '#ffffff',
-                border: `3px solid ${
-                  (receivingCall && !callAccepted)
-                    ? 'var(--success, #00cc66)'
-                    : (callingOutgoing && !callAccepted)
-                    ? 'var(--accent-primary, #3b82f6)'
-                    : 'var(--text-secondary, #a8a29e)'
-                }`,
-                boxShadow: 'var(--shadow-lg)',
-              }}
-            >
-              {displayName?.[0]?.toUpperCase() || '?'}
+          {/* Video Streams elements inside DOM */}
+          {CallType === 'video' && (
+            <>
+              {/* Remote Video (Full Screen) */}
+              <video
+                ref={remotevideoRef}
+                autoPlay
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 1,
+                  display: callAccepted ? 'block' : 'none',
+                }}
+              />
+
+              {/* Local Video (Floating PIP) */}
+              <video
+                ref={localvideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  width: '120px',
+                  height: '160px',
+                  borderRadius: '12px',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                  zIndex: 3,
+                  transform: 'scaleX(-1)', // Mirror effect
+                  display: (callingOutgoing || callAccepted) ? 'block' : 'none',
+                  background: '#000',
+                }}
+              />
+            </>
+          )}
+
+          {/* Avatar Container (only show for audio, or when video call is not accepted yet) */}
+          {!(CallType === 'video' && callAccepted) && (
+            <div style={{ position: 'relative', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div
+                className={`avatar avatar-lg ${(receivingCall && !callAccepted) ? 'pulse-green' : (callingOutgoing && !callAccepted) ? 'pulse-blue' : ''}`}
+                style={{
+                  width: '96px',
+                  height: '96px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #1f1f1f, #2d2d2d)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2.5rem',
+                  fontWeight: '700',
+                  color: '#ffffff',
+                  border: `3px solid ${
+                    (receivingCall && !callAccepted)
+                      ? 'var(--success, #00cc66)'
+                      : (callingOutgoing && !callAccepted)
+                      ? 'var(--accent-primary, #3b82f6)'
+                      : 'var(--text-secondary, #a8a29e)'
+                  }`,
+                  boxShadow: 'var(--shadow-lg)',
+                  zIndex: 2,
+                }}
+              >
+                {displayName?.[0]?.toUpperCase() || '?'}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Calling Details */}
-          <div style={{ textAlign: 'center', marginBottom: '48px', zIndex: 1 }}>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: '700', margin: '0 0 8px 0', letterSpacing: '-0.025em' }}>
+          <div
+            style={{
+              textAlign: 'center',
+              marginBottom: (CallType === 'video' && callAccepted) ? '20px' : '48px',
+              zIndex: 2,
+              ...(CallType === 'video' && callAccepted ? {
+                position: 'absolute',
+                top: '20px',
+                left: '20px',
+                textAlign: 'left',
+                background: 'rgba(0, 0, 0, 0.5)',
+                padding: '10px 16px',
+                borderRadius: '12px',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                marginBottom: 0,
+              } : {})
+            }}
+          >
+            <h3 style={{
+              fontSize: (CallType === 'video' && callAccepted) ? '1.1rem' : '1.5rem',
+              fontWeight: '700',
+              margin: '0 0 8px 0',
+              letterSpacing: '-0.025em',
+              textShadow: (CallType === 'video' && callAccepted) ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'
+            }}>
               {displayName}
             </h3>
-            <p style={{ color: 'var(--text-secondary, #b3b3b3)', fontSize: '0.9rem', margin: 0, fontWeight: '500' }}>
-              {(receivingCall && !callAccepted) && 'Incoming Audio Call...'}
-              {(callingOutgoing && !callAccepted) && 'Calling...'}
-              {callAccepted && 'Active Call'}
+            <p style={{
+              color: 'var(--text-secondary, #b3b3b3)',
+              fontSize: '0.9rem',
+              margin: 0,
+              fontWeight: '500',
+              textShadow: (CallType === 'video' && callAccepted) ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'
+            }}>
+              {(receivingCall && !callAccepted) && (CallType === 'video' ? 'Incoming Video Call...' : 'Incoming Audio Call...')}
+              {(callingOutgoing && !callAccepted) && (CallType === 'video' ? 'Video Calling...' : 'Calling...')}
+              {callAccepted && (CallType === 'video' ? 'Active Video Call' : 'Active Call')}
             </p>
 
             {/* Call Timer & Audio Wave for Active Calls */}
             {callAccepted && (
-              <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                marginTop: (CallType === 'video' && callAccepted) ? '8px' : '24px',
+                display: 'flex',
+                flexDirection: (CallType === 'video' && callAccepted) ? 'row' : 'column',
+                alignItems: 'center',
+                gap: '16px',
+              }}>
                 <div
                   style={{
                     background: 'rgba(255, 255, 255, 0.08)',
@@ -1296,19 +1441,39 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 </div>
 
                 {/* Animated Wave */}
-                <div style={{ display: 'flex', gap: '6px', height: '32px', alignItems: 'flex-end', marginTop: '8px' }}>
-                  <div className="voice-wave-bar" />
-                  <div className="voice-wave-bar" />
-                  <div className="voice-wave-bar" />
-                  <div className="voice-wave-bar" />
-                  <div className="voice-wave-bar" />
-                </div>
+                {CallType !== 'video' && (
+                  <div style={{ display: 'flex', gap: '6px', height: '32px', alignItems: 'flex-end', marginTop: '8px' }}>
+                    <div className="voice-wave-bar" />
+                    <div className="voice-wave-bar" />
+                    <div className="voice-wave-bar" />
+                    <div className="voice-wave-bar" />
+                    <div className="voice-wave-bar" />
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Action Buttons Bar */}
-          <div style={{ display: 'flex', gap: '40px', alignItems: 'center', zIndex: 1 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '40px',
+              alignItems: 'center',
+              zIndex: 2,
+              ...(CallType === 'video' && callAccepted ? {
+                position: 'absolute',
+                bottom: '30px',
+                background: 'rgba(0, 0, 0, 0.5)',
+                padding: '12px 24px',
+                borderRadius: '40px',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              } : {})
+            }}
+          >
             {(receivingCall && !callAccepted) && (
               <>
                 {/* Decline Button */}

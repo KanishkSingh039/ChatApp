@@ -10,6 +10,9 @@ const call=(io,socket)=>{
     // console.log("Received answer:", answer);
     socket.to(data.roomId).emit("answer-read", data.answer); // Broadcast the answer to all other connected clients
   });
+  socket.on("call-type",(data)=>{
+    socket.to(data.roomId).emit("call-type-read",data.callType);
+  })
   socket.on("ice-candidate", (data) => {
     // console.log("Received ICE candidate:", candidate);
     socket.to(data.roomId).emit("ice-candidate-read", data.candidate); // Broadcast the ICE candidate to all other connected clients
