@@ -30,6 +30,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [CallType,setCallType] = useState(null);  
+  const CallTypeRef=useRef(null);
   const remotevideoRef = useRef(null);
   const localvideoRef = useRef(null);
   const pc = useRef(null);
@@ -99,22 +100,16 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     });
     socket.on("call-type-read",(type)=>{
       console.log("Recieved call type",type);
+      CallTypeRef.current = type;
       setCallType(type);
     })
     pc.current.ontrack = (event) => {
-      if(CallType=="video"){
         console.log("track recieved");
 
         console.log(event);
         console.log("Received remote track :", event.streams[0]);
         setRemoteStream(event.streams[0]);
-      }else if(CallType=="audio"){
-        console.log("track recieved");
-
-        console.log(event);
-        console.log("Received remote track :", event.streams[0]);
-        setRemoteStream(event.streams[0]);
-      }
+      
       
     }
     socket.on("end-call-read", (data) => {
@@ -131,6 +126,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     if (remotevideoRef.current) {
       remotevideoRef.current.srcObject = null;
     }
+    CallTypeRef.current = null;
     setCallType(null);
     setCallAccepted(false);
     setReceivingCall(false);
@@ -148,7 +144,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   async function handleOffer(offer) {
     console.log("Handling answering");
     let stream;
-    if(CallType=="video"){
+    if(CallTypeRef.current=="video"){
       stream = await navigator.mediaDevices.getUserMedia(
         {
           audio: true,
@@ -158,7 +154,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
       if (localvideoRef.current) {
         localvideoRef.current.srcObject = stream;
       }
-    }else if(CallType=="audio" || !CallType){
+    }else if(CallTypeRef.current=="audio" || !CallTypeRef.current){
       stream = await navigator.mediaDevices.getUserMedia(
         {
           audio: true,
@@ -231,10 +227,11 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   // Hook UI call button click to createCallOffer
   const handleStartCall = async (type) => {
     const actualType = (type === 'audio' || type === 'video') ? type : 'audio';
-    setCallType(actualType);
-    setCallingOutgoing(true);
+    CallTypeRef.current = actualType;
     socket.emit("call-type", { roomId, callType: actualType });
     await createCallOffer(actualType);
+    setCallingOutgoing(true);
+    setCallType(actualType);
   };
 
   // Toggle microphone track mute status
@@ -264,6 +261,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     if (remotevideoRef.current) {
       remotevideoRef.current.srcObject = null;
     }
+    CallTypeRef.current = null;
     setCallType(null);
     setCallAccepted(false);
     setReceivingCall(false);
