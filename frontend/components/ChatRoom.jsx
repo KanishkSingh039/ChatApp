@@ -117,6 +117,26 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
       }
       
     }
+    socket.on("end-call-read", (data) => {
+    if (pc.current) {
+      pc.current.getSenders().forEach((sender) => {
+        if (sender.track) {
+          sender.track.stop();
+        }
+      });
+    }
+    if (localvideoRef.current) {
+      localvideoRef.current.srcObject = null;
+    }
+    if (remotevideoRef.current) {
+      remotevideoRef.current.srcObject = null;
+    }
+    setCallType(null);
+    setCallAccepted(false);
+    setReceivingCall(false);
+    setCallingOutgoing(false);
+    setIsMuted(false);
+    });
     return () => {
       socket.off("offer-read");
       socket.off("answer-read");
@@ -249,6 +269,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     setReceivingCall(false);
     setCallingOutgoing(false);
     setIsMuted(false);
+    socket.emit('end-call', { roomId });
   };
 
   const formatDuration = (seconds) => {

@@ -17,6 +17,11 @@ const call=(io,socket)=>{
     // console.log("Received ICE candidate:", candidate);
     socket.to(data.roomId).emit("ice-candidate-read", data.candidate); // Broadcast the ICE candidate to all other connected clients
   });
+  socket.on("end-call", (data) => {
+    socket.to(data.roomId).emit("end-call-read", {
+      call:"end-call",
+    });
+  })
     } catch (error) {
         return socket.emit('messagestorage',{
             message:error.message
