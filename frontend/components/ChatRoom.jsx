@@ -724,7 +724,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     socket.emit("offer", { roomId, offer });
   }
   return (
-    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)', position: 'relative' }}>
       {/* Header */}
       <div
         style={{
@@ -1286,6 +1286,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             overflow: 'hidden',
+            borderRadius: isMobile ? '0' : '12px',
           }}
         >
           <style>{`
@@ -1345,6 +1346,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   objectFit: 'cover',
                   zIndex: 1,
                   display: callAccepted ? 'block' : 'none',
+                  borderRadius: isMobile ? '0' : '12px',
                 }}
               />
 
@@ -1356,11 +1358,11 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 muted
                 style={{
                   position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  width: '120px',
-                  height: '160px',
-                  borderRadius: '12px',
+                  top: isMobile ? '12px' : '20px',
+                  right: isMobile ? '12px' : '20px',
+                  width: isMobile ? '80px' : '120px',
+                  height: isMobile ? '110px' : '160px',
+                  borderRadius: isMobile ? '8px' : '12px',
                   objectFit: 'cover',
                   border: '2px solid rgba(255, 255, 255, 0.3)',
                   boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
@@ -1413,12 +1415,12 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
               zIndex: 2,
               ...(CallType === 'video' && callAccepted ? {
                 position: 'absolute',
-                top: '20px',
-                left: '20px',
+                top: isMobile ? '12px' : '20px',
+                left: isMobile ? '12px' : '20px',
                 textAlign: 'left',
                 background: 'rgba(0, 0, 0, 0.5)',
-                padding: '10px 16px',
-                borderRadius: '12px',
+                padding: isMobile ? '6px 12px' : '10px 16px',
+                borderRadius: isMobile ? '8px' : '12px',
                 backdropFilter: 'blur(8px)',
                 WebkitBackdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -1427,7 +1429,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             }}
           >
             <h3 style={{
-              fontSize: (CallType === 'video' && callAccepted) ? '1.1rem' : '1.5rem',
+              fontSize: (CallType === 'video' && callAccepted) ? (isMobile ? '0.95rem' : '1.1rem') : '1.5rem',
               fontWeight: '700',
               margin: '0 0 8px 0',
               letterSpacing: '-0.025em',
@@ -1489,14 +1491,14 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
           <div
             style={{
               display: 'flex',
-              gap: '40px',
+              gap: isMobile ? '20px' : '40px',
               alignItems: 'center',
               zIndex: 2,
               ...(CallType === 'video' && callAccepted ? {
                 position: 'absolute',
-                bottom: '30px',
+                bottom: isMobile ? '40px' : '30px',
                 background: 'rgba(0, 0, 0, 0.5)',
-                padding: '12px 24px',
+                padding: isMobile ? '8px 16px' : '12px 24px',
                 borderRadius: '40px',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
@@ -1512,8 +1514,8 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onClick={endCall}
                   title="Decline"
                   style={{
-                    width: '64px',
-                    height: '64px',
+                    width: isMobile ? '52px' : '64px',
+                    height: isMobile ? '52px' : '64px',
                     borderRadius: '50%',
                     background: 'var(--danger, #ff4444)',
                     border: 'none',
@@ -1528,7 +1530,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width={isMobile ? "20" : "24"} height={isMobile ? "20" : "24"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
                     <line x1="23" y1="1" x2="1" y2="23" />
                   </svg>
@@ -1539,8 +1541,8 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onClick={handleAnswerCall}
                   title="Answer"
                   style={{
-                    width: '64px',
-                    height: '64px',
+                    width: isMobile ? '52px' : '64px',
+                    height: isMobile ? '52px' : '64px',
                     borderRadius: '50%',
                     background: 'var(--success, #00cc66)',
                     border: 'none',
@@ -1555,7 +1557,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width={isMobile ? "20" : "24"} height={isMobile ? "20" : "24"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                   </svg>
                 </button>
@@ -1568,8 +1570,8 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 onClick={endCall}
                 title="Cancel Call"
                 style={{
-                  width: '64px',
-                  height: '64px',
+                  width: isMobile ? '52px' : '64px',
+                  height: isMobile ? '52px' : '64px',
                   borderRadius: '50%',
                   background: 'var(--danger, #ff4444)',
                   border: 'none',
@@ -1584,7 +1586,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width={isMobile ? "20" : "24"} height={isMobile ? "20" : "24"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
                   <line x1="23" y1="1" x2="1" y2="23" />
                 </svg>
@@ -1598,8 +1600,8 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onClick={toggleMute}
                   title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
                   style={{
-                    width: '56px',
-                    height: '56px',
+                    width: isMobile ? '48px' : '56px',
+                    height: isMobile ? '48px' : '56px',
                     borderRadius: '50%',
                     background: isMuted ? 'var(--danger, #ff4444)' : 'rgba(255, 255, 255, 0.1)',
                     border: isMuted ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
@@ -1615,7 +1617,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; if (!isMuted) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
                 >
                   {isMuted ? (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width={isMobile ? "18" : "22"} height={isMobile ? "18" : "22"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="1" y1="1" x2="23" y2="23" />
                       <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
                       <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
@@ -1623,7 +1625,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                       <line x1="8" y1="23" x2="16" y2="23" />
                     </svg>
                   ) : (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width={isMobile ? "18" : "22"} height={isMobile ? "18" : "22"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                       <line x1="12" y1="19" x2="12" y2="23" />
@@ -1637,8 +1639,8 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onClick={endCall}
                   title="End Call"
                   style={{
-                    width: '64px',
-                    height: '64px',
+                    width: isMobile ? '52px' : '64px',
+                    height: isMobile ? '52px' : '64px',
                     borderRadius: '50%',
                     background: 'var(--danger, #ff4444)',
                     border: 'none',
@@ -1653,7 +1655,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width={isMobile ? "20" : "24"} height={isMobile ? "20" : "24"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                   </svg>
                 </button>
