@@ -792,11 +792,13 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             <button
               title="Audio Call"
               onClick={() => handleStartCall('audio')}
+              disabled={CallType === 'video'}
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--text-secondary)',
-                cursor: 'pointer',
+                cursor: CallType === 'video' ? 'not-allowed' : 'pointer',
+                opacity: CallType === 'video' ? 0.4 : 1,
                 padding: '8px',
                 borderRadius: 'var(--radius-full)',
                 display: 'flex',
@@ -805,12 +807,16 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 transition: 'all var(--transition-fast)',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.color = 'var(--text-primary)';
+                if (CallType !== 'video') {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'none';
-                e.currentTarget.style.color = 'var(--text-secondary)';
+                if (CallType !== 'video') {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -822,11 +828,13 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             <button
               title="Video Call"
               onClick={() => handleStartCall('video')}
+              disabled={CallType === 'audio'}
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'var(--text-secondary)',
-                cursor: 'pointer',
+                cursor: CallType === 'audio' ? 'not-allowed' : 'pointer',
+                opacity: CallType === 'audio' ? 0.4 : 1,
                 padding: '8px',
                 borderRadius: 'var(--radius-full)',
                 display: 'flex',
@@ -835,12 +843,16 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                 transition: 'all var(--transition-fast)',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--bg-hover)';
-                e.currentTarget.style.color = 'var(--text-primary)';
+                if (CallType !== 'audio') {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'none';
-                e.currentTarget.style.color = 'var(--text-secondary)';
+                if (CallType !== 'audio') {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
