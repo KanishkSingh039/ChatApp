@@ -20,7 +20,7 @@ app.use(express.urlencoded({
 }));
 app.use(cor(
     {
-        origin:"https://speakify-pg3w.onrender.com",
+        origin:"https://speakify.kanishk.online/",
         methods: ["GET", "POST"]
     }
 ));
