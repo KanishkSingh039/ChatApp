@@ -30,7 +30,7 @@ app.use(express.json({
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "https://speakify-pg3w.onrender.com",
+        origin: "https://speakify.kanishk.online",
         methods: ["GET", "POST"]
     }
 });
