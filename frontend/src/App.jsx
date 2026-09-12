@@ -3,6 +3,7 @@ import { useContext } from 'react';
 import { AuthContext } from '../context/context';
 import LoginPage from '../components/LoginPage';
 import RegisterPage from '../components/RegisterPage';
+import LandingPage from '../components/LandingPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 import MainLayout from '../components/MainLayout';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -14,11 +15,12 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div style={{ height: '100%', width: '100%', background: 'var(--bg-primary)' }}>
+      <div style={{ minHeight: '100vh', width: '100%', background: 'var(--bg-primary)' }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<RegisterPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Protected Routes */}
           <Route
@@ -30,14 +32,14 @@ function App() {
             }
           />
 
-          {/* Root - Redirect to home or login */}
+          {/* Root - Landing page */}
           <Route
             path="/"
             element={
               auth.isAuthenticated ? (
                 <Navigate to="/home" replace />
               ) : (
-                <Navigate to="/login" replace />
+                <LandingPage />
               )
             }
           />

@@ -1,10 +1,92 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
 import { SOCKET_EVENTS } from '../utils/config';
 import { api } from '../utils/api';
 
-export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtype, Type, type, sidebarOpen, onToggleSidebar }) {
+// Pleasant synthetic incoming call ringtone using Web Audio API (zero external asset dependencies)
+class CallRingtone {
+  constructor() {
+    this.ctx = null;
+    this.timer = null;
+    this.isPlaying = false;
+  }
+
+  start() {
+    if (this.isPlaying) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      this.ctx = new AudioContextClass();
+      this.isPlaying = true;
+
+      const playChime = () => {
+        if (!this.isPlaying || !this.ctx || this.ctx.state === 'closed') return;
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(440, now); // A4
+        osc2.frequency.setValueAtTime(480, now); // B4
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.14, now + 0.08);
+        gain.gain.linearRampToValueAtTime(0.11, now + 1.2);
+        gain.gain.linearRampToValueAtTime(0, now + 1.6);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 1.6);
+        osc2.stop(now + 1.6);
+      };
+
+      playChime();
+      this.timer = setInterval(playChime, 3000);
+    } catch (e) {
+      console.warn('Ringtone playback error:', e);
+    }
+  }
+
+  stop() {
+    this.isPlaying = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    if (this.ctx) {
+      try {
+        this.ctx.close().catch(() => {});
+      } catch {}
+      this.ctx = null;
+    }
+  }
+}
+
+export function ChatRoom({
+  roomId,
+  roomName,
+  roomMembers = [],
+  roomType,
+  roomtype,
+  Type,
+  type,
+  sidebarOpen,
+  onToggleSidebar,
+  incomingCall,
+  incomingCandidates,
+  onClearIncomingCall,
+}) {
   const auth = useAuth();
   const rawType = (roomType || roomtype || Type || type || '').toLowerCase();
   const isFriendRoom = rawType === 'friend';
@@ -29,8 +111,11 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const [callingOutgoing, setCallingOutgoing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [CallType,setCallType] = useState(null);  
-  const CallTypeRef=useRef(null);
+  const [isVideoDisabled, setIsVideoDisabled] = useState(false);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
+  const [CallType, setCallType] = useState(null);
+  const CallTypeRef = useRef(null);
+  const ringtoneRef = useRef(new CallRingtone());
   const remotevideoRef = useRef(null);
   const localvideoRef = useRef(null);
   const pc = useRef(null);
@@ -38,139 +123,181 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
-  useEffect(() => {
 
+  // Sync incoming call from global listener in MainLayout
+  useEffect(() => {
+    if (incomingCall && incomingCall.roomId === roomId && !callAccepted) {
+      setReceivedOffer(incomingCall.offer);
+      setReceivingCall(true);
+      if (incomingCall.callType) {
+        setCallType(incomingCall.callType);
+        CallTypeRef.current = incomingCall.callType;
+      }
+    }
+  }, [incomingCall, roomId, callAccepted]);
+
+  // Handle ringing chime audio lifecycle
+  useEffect(() => {
+    if (receivingCall && !callAccepted) {
+      ringtoneRef.current.start();
+    } else {
+      ringtoneRef.current.stop();
+    }
+    return () => {
+      ringtoneRef.current.stop();
+    };
+  }, [receivingCall, callAccepted]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
     pc.current = new RTCPeerConnection({
       iceServers: [
-        {
-          urls: "stun:stun.relay.metered.ca:80",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:80",
-          username: "e99870728f0ca2813222e012",
-          credential: "8tssdcmlX3N3S1VZ",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:80?transport=tcp",
-          username: "e99870728f0ca2813222e012",
-          credential: "8tssdcmlX3N3S1VZ",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:443",
-          username: "e99870728f0ca2813222e012",
-          credential: "8tssdcmlX3N3S1VZ",
-        },
-        {
-          urls: "turns:global.relay.metered.ca:443?transport=tcp",
-          username: "e99870728f0ca2813222e012",
-          credential: "8tssdcmlX3N3S1VZ",
-        },
+        { urls: "stun:stun.relay.metered.ca:80" },
+        { urls: "turn:global.relay.metered.ca:80", username: "e99870728f0ca2813222e012", credential: "8tssdcmlX3N3S1VZ" },
+        { urls: "turn:global.relay.metered.ca:80?transport=tcp", username: "e99870728f0ca2813222e012", credential: "8tssdcmlX3N3S1VZ" },
+        { urls: "turn:global.relay.metered.ca:443", username: "e99870728f0ca2813222e012", credential: "8tssdcmlX3N3S1VZ" },
+        { urls: "turns:global.relay.metered.ca:443?transport=tcp", username: "e99870728f0ca2813222e012", credential: "8tssdcmlX3N3S1VZ" },
       ],
-    }
-    );
-    socket.on("offer-read", async (offer) => {
+    });
+
+    const handleOfferRead = async (offer) => {
       setReceivedOffer(offer);
       setReceivingCall(true);
+      if (offer?.callType) {
+        setCallType(offer.callType);
+        CallTypeRef.current = offer.callType;
+      }
       for (const candidate of pendingCandidates.current) {
-        await pc.current.addIceCandidate(
-          new RTCIceCandidate(candidate)
-        );
+        try {
+          await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn("ICE error:", e);
+        }
       }
       pendingCandidates.current = [];
-    });
-    socket.on("answer-read", async (answer) => {
+    };
+
+    const handleAnswerRead = async (answer) => {
       await pc.current.setRemoteDescription(new RTCSessionDescription(answer));
       setCallAccepted(true);
       setCallingOutgoing(false);
-    });
-    socket.on("ice-candidate-read", async (candidate) => {
+    };
+
+    const handleIceCandidateRead = async (candidate) => {
       try {
         if (!pc.current.remoteDescription) {
           pendingCandidates.current.push(candidate);
-        }
-        else {
-          console.log("Adding received ice candidate", candidate);
-          await pc.current.addIceCandidate(
-            new RTCIceCandidate(candidate));
-
+        } else {
+          await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
         }
       } catch (e) {
         console.error("Error adding received ice candidate", e);
       }
-    });
-    socket.on("call-type-read",(type)=>{
-      console.log("Recieved call type",type);
-      CallTypeRef.current = type;
-      setCallType(type);
-    })
-    pc.current.ontrack = (event) => {
-        console.log("track recieved");
-
-        console.log(event);
-        console.log("Received remote track :", event.streams[0]);
-        setRemoteStream(event.streams[0]);
-      
-      
-    }
-    socket.on("end-call-read", (data) => {
-    if (pc.current) {
-      pc.current.getSenders().forEach((sender) => {
-        if (sender.track) {
-          sender.track.stop();
-        }
-      });
-    }
-    if (localvideoRef.current) {
-      localvideoRef.current.srcObject = null;
-    }
-    if (remotevideoRef.current) {
-      remotevideoRef.current.srcObject = null;
-    }
-    CallTypeRef.current = null;
-    setCallType(null);
-    setCallAccepted(false);
-    setReceivingCall(false);
-    setCallingOutgoing(false);
-    setIsMuted(false);
-    });
-    return () => {
-      socket.off("offer-read");
-      socket.off("answer-read");
-      socket.off("ice-candidate-read");
-      pc.current.close();
     };
-  }, []);
+
+    const handleCallTypeRead = (type) => {
+      const actual = typeof type === 'object' ? type?.callType : type;
+      CallTypeRef.current = actual;
+      setCallType(actual);
+    };
+
+    pc.current.ontrack = (event) => {
+      console.log("Received remote track :", event.streams[0]);
+      setRemoteStream(event.streams[0]);
+    };
+
+    const handleEndCallRead = () => {
+      ringtoneRef.current.stop();
+      if (pc.current) {
+        pc.current.getSenders().forEach((sender) => {
+          if (sender.track) {
+            sender.track.stop();
+          }
+        });
+      }
+      if (localvideoRef.current) {
+        localvideoRef.current.srcObject = null;
+      }
+      if (remotevideoRef.current) {
+        remotevideoRef.current.srcObject = null;
+      }
+      CallTypeRef.current = null;
+      setCallType(null);
+      setCallAccepted(false);
+      setReceivingCall(false);
+      setCallingOutgoing(false);
+      setIsMuted(false);
+      setIsVideoDisabled(false);
+      setIsCallMinimized(false);
+      if (onClearIncomingCall) onClearIncomingCall();
+    };
+
+    socket.on("offer-read", handleOfferRead);
+    socket.on("answer-read", handleAnswerRead);
+    socket.on("ice-candidate-read", handleIceCandidateRead);
+    socket.on("call-type-read", handleCallTypeRead);
+    socket.on("end-call-read", handleEndCallRead);
+
+    return () => {
+      ringtoneRef.current.stop();
+      socket.off("offer-read", handleOfferRead);
+      socket.off("answer-read", handleAnswerRead);
+      socket.off("ice-candidate-read", handleIceCandidateRead);
+      socket.off("call-type-read", handleCallTypeRead);
+      socket.off("end-call-read", handleEndCallRead);
+      if (pc.current) {
+        pc.current.getSenders().forEach((sender) => {
+          if (sender.track) {
+            sender.track.stop();
+          }
+        });
+        pc.current.close();
+      }
+    };
+  }, [socket, onClearIncomingCall]);
 
   async function handleOffer(offer) {
-    console.log("Handling answering");
+    console.log("Handling answering offer");
+    const isVideo = CallTypeRef.current === "video";
     let stream;
-    if(CallTypeRef.current=="video"){
-      stream = await navigator.mediaDevices.getUserMedia(
-        {
-          audio: true,
-          video: true,
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideo,
+      });
+    } catch (err) {
+      console.warn("getUserMedia error:", err);
+      if (isVideo) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (e) {
+          console.error("Audio fallback error:", e);
         }
-      );
-      if (localvideoRef.current) {
-        localvideoRef.current.srcObject = stream;
       }
-    }else if(CallTypeRef.current=="audio" || !CallTypeRef.current){
-      stream = await navigator.mediaDevices.getUserMedia(
-        {
-          audio: true,
-        }
-      );
     }
     if (stream) {
+      if (isVideo && localvideoRef.current) {
+        localvideoRef.current.srcObject = stream;
+      }
       stream.getTracks().forEach((track) => {
         pc.current.addTrack(track, stream);
       });
     }
     await pc.current.setRemoteDescription(new RTCSessionDescription(offer));
-    for (const candidate of pendingCandidates.current) {
-      await pc.current.addIceCandidate(
-        new RTCIceCandidate(candidate)
-      );
+    const allCandidates = [
+      ...(incomingCandidates || []),
+      ...pendingCandidates.current,
+    ];
+    const uniqueCandidates = allCandidates.filter((candidate, index, candidates) => {
+      const fingerprint = candidate?.candidate || JSON.stringify(candidate);
+      return candidates.findIndex((item) => (item?.candidate || JSON.stringify(item)) === fingerprint) === index;
+    });
+    for (const candidate of uniqueCandidates) {
+      try {
+        await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn("ICE error:", e);
+      }
     }
     pendingCandidates.current = [];
     const answer = await pc.current.createAnswer();
@@ -178,10 +305,10 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     socket.emit("answer", { roomId, answer });
     pc.current.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("reciever ice candidate", event.candidate);
+        console.log("receiver ice candidate", event.candidate);
         socket.emit("ice-candidate", { roomId, candidate: event.candidate });
       }
-    }
+    };
   }
 
   // Call duration timer
@@ -201,12 +328,12 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   // Play remote audio stream when tracks are received
   useEffect(() => {
     if (remoteStream) {
-      if(CallType=="audio"){
+      if (CallType === "audio") {
         if (remoteAudioRef.current) {
           console.log("Setting remote audio element stream source:", remoteStream);
           remoteAudioRef.current.srcObject = remoteStream;
         }
-      }else if(CallType=="video"){
+      } else if (CallType === "video") {
         if (remotevideoRef.current) {
           console.log("Setting remote video element stream source:", remoteStream);
           remotevideoRef.current.srcObject = remoteStream;
@@ -216,11 +343,21 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   }, [remoteStream, CallType]);
 
   // Hook UI answer button click to handleOffer
+  const getCallContext = (callType) => ({
+    callType,
+    roomId,
+    callerName: auth.user?.name || 'Unknown caller',
+    callerId: auth.user?._id,
+    roomName: displayName,
+  });
+
   const handleAnswerCall = async () => {
     if (!receivedOffer) return;
+    ringtoneRef.current.stop();
     setCallAccepted(true);
-    socket.emit("call-type", { roomId, callType: CallType });
+    socket.emit("call-type", { roomId, callType: getCallContext(CallType) });
     setReceivingCall(false);
+    if (onClearIncomingCall) onClearIncomingCall();
     await handleOffer(receivedOffer);
   };
 
@@ -228,7 +365,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const handleStartCall = async (type) => {
     const actualType = (type === 'audio' || type === 'video') ? type : 'audio';
     CallTypeRef.current = actualType;
-    socket.emit("call-type", { roomId, callType: actualType });
+    socket.emit("call-type", { roomId, callType: getCallContext(actualType) });
     await createCallOffer(actualType);
     setCallingOutgoing(true);
     setCallType(actualType);
@@ -246,8 +383,21 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     }
   };
 
+  // Toggle video camera track on/off
+  const toggleVideo = () => {
+    if (pc.current) {
+      pc.current.getSenders().forEach((sender) => {
+        if (sender.track && sender.track.kind === 'video') {
+          sender.track.enabled = !sender.track.enabled;
+          setIsVideoDisabled(!sender.track.enabled);
+        }
+      });
+    }
+  };
+
   // Hangup / cancel call
   const endCall = () => {
+    ringtoneRef.current.stop();
     if (pc.current) {
       pc.current.getSenders().forEach((sender) => {
         if (sender.track) {
@@ -267,6 +417,9 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
     setReceivingCall(false);
     setCallingOutgoing(false);
     setIsMuted(false);
+    setIsVideoDisabled(false);
+    setIsCallMinimized(false);
+    if (onClearIncomingCall) onClearIncomingCall();
     socket.emit('end-call', { roomId });
   };
 
@@ -701,10 +854,15 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
   const createCallOffer = async (actualType) => {
     console.log("creating call offer", actualType);
     const isVideo = actualType === 'video';
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: isVideo
-    });
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+    } catch (error) {
+      // A busy/unavailable camera should not prevent a video caller joining by audio.
+      if (!isVideo) throw error;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      setIsVideoDisabled(true);
+    }
     console.log("Stream", stream);
     if (isVideo && localvideoRef.current) {
       localvideoRef.current.srcObject = stream;
@@ -721,7 +879,18 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
         socket.emit("ice-candidate", { roomId, candidate: event.candidate });
       }
     }
-    socket.emit("offer", { roomId, offer });
+    // The server relays data.offer unchanged, so call context travels without a backend change.
+    socket.emit("offer", {
+      roomId,
+      offer: {
+        ...offer,
+        roomId,
+        callerName: auth.user?.name || 'Unknown caller',
+        callerId: auth.user?._id,
+        callType: actualType,
+        roomName: displayName,
+      },
+    });
   }
   return (
     <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)', position: 'relative' }}>
@@ -1266,14 +1435,13 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
       <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
 
       {/* Call Overlays */}
-      {(receivingCall || callingOutgoing || callAccepted) && (
+      {(receivingCall || callingOutgoing || callAccepted) && createPortal((
         <div
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            position: 'fixed',
+            inset: isCallMinimized ? 'auto 18px 18px auto' : 0,
+            width: isCallMinimized ? (isMobile ? 'calc(100vw - 36px)' : '380px') : 'auto',
+            height: isCallMinimized ? '220px' : 'auto',
             background: (CallType === 'video' && callAccepted) ? 'rgba(0, 0, 0, 0.2)' : 'rgba(10, 10, 10, 0.9)',
             backdropFilter: (CallType === 'video' && callAccepted) ? 'none' : 'blur(24px)',
             WebkitBackdropFilter: (CallType === 'video' && callAccepted) ? 'none' : 'blur(24px)',
@@ -1281,12 +1449,13 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
+            zIndex: 999999,
             color: '#ffffff',
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             overflow: 'hidden',
-            borderRadius: isMobile ? '0' : '12px',
+            borderRadius: isCallMinimized || !isMobile ? '12px' : '0',
+            boxShadow: isCallMinimized ? '0 20px 60px rgba(0, 0, 0, 0.5)' : 'none',
           }}
         >
           <style>{`
@@ -1634,6 +1803,32 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
                   )}
                 </button>
 
+                {CallType === 'video' && (
+                  <button
+                    onClick={toggleVideo}
+                    title={isVideoDisabled ? 'Turn camera on' : 'Turn camera off'}
+                    style={{
+                      width: isMobile ? '48px' : '56px', height: isMobile ? '48px' : '56px', borderRadius: '50%',
+                      background: isVideoDisabled ? 'var(--danger, #ff4444)' : 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)', color: '#fff', cursor: 'pointer',
+                    }}
+                  >
+                    {isVideoDisabled ? '◫' : '▣'}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setIsCallMinimized((value) => !value)}
+                  title={isCallMinimized ? 'Return to full screen' : 'Minimize call'}
+                  style={{
+                    width: isMobile ? '48px' : '56px', height: isMobile ? '48px' : '56px', borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: '#fff', cursor: 'pointer', fontSize: '1.2rem',
+                  }}
+                >
+                  {isCallMinimized ? '⛶' : '−'}
+                </button>
+
                 {/* End Call Button */}
                 <button
                   onClick={endCall}
@@ -1663,7 +1858,7 @@ export function ChatRoom({ roomId, roomName, roomMembers = [], roomType, roomtyp
             )}
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

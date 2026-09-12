@@ -63,7 +63,8 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Custom Scrollbar */
@@ -102,12 +103,36 @@ body {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-slide-up-delay-1 {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+.animate-slide-up-delay-2 {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+.animate-slide-up-delay-3 {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both;
 }
 
 @keyframes fadeInDown {

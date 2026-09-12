@@ -3,32 +3,33 @@ import { useAuth } from '../hooks/useAuth';
 import { api } from '../utils/api';
 // import { checkout } from '../../backend/routes/request';
 
-export function MessagesList({ onSelectRoom, selectedRoomId, setchatroomactive, chatroomactive }) {
+export function MessagesList({ onSelectRoom, selectedRoomId, setchatroomactive, chatroomactive, rooms: propRooms, onRefreshRooms }) {
   const auth = useAuth();
-  const [rooms, setRooms] = useState([]);
+  const [internalRooms, setInternalRooms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch rooms using _id
+  const rooms = propRooms !== undefined ? propRooms : internalRooms;
+
+  // Fetch rooms if not provided via props
   useEffect(() => {
+    if (propRooms !== undefined) return;
     if (!auth.user?._id) return;
 
     setLoading(true);
     api
       .fetchRooms(auth.user._id)
       .then((data) => {
-        
         const roomsData = data.data || data.content || [];
-        setRooms(Array.isArray(roomsData) ? roomsData : []);
+        setInternalRooms(Array.isArray(roomsData) ? roomsData : []);
       })
       .catch((err) => {
         console.error('Failed to fetch rooms:', err);
-          auth.logout();
-        
-        setRooms([]);
+        auth.logout();
+        setInternalRooms([]);
       })
       .finally(() => setLoading(false));
-  }, [auth.user?._id]);
+  }, [auth.user?._id, propRooms]);
 
   // Filter rooms based on search
   const filteredRooms = rooms.filter((room) => {

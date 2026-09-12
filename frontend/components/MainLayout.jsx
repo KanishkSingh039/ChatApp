@@ -1,8 +1,9 @@
-import { useEffect, useState} from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
+import { api } from '../utils/api';
 import ChatRoom from './ChatRoom';
 import MessagesList from './MessagesList';
 import FriendRequests from './FriendRequests';
@@ -10,14 +11,18 @@ import SearchUsers from './SearchUsers';
 import SearchGroups from './SearchGroups';
 import UserProfile from './UserProfile';
 import CreateGroup from './CreateGroup';
-import { SOCKET_EVENTS,STORAGE_KEYS } from '../utils/config';
+import { SOCKET_EVENTS, STORAGE_KEYS } from '../utils/config';
 import { showToast } from './Toast';
+
 export function MainLayout() {
   const navigate = useNavigate();
   const auth = useAuth();
   const { socket } = useSocket();
 
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [incomingCandidates, setIncomingCandidates] = useState([]);
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showSearchUsers, setShowSearchUsers] = useState(false);
@@ -28,6 +33,11 @@ export function MainLayout() {
   const [chatroomactive, setchatroomactive] = useState(false);
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'search' | 'requests'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  const clearIncomingCall = useCallback(() => {
+    setIncomingCall(null);
+    setIncomingCandidates([]);
+  }, []);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -46,24 +56,65 @@ export function MainLayout() {
     }
   }, []);
 
+  // Fetch all user rooms and join their socket channels so user receives calls from any room
+  const refreshRooms = useCallback(async () => {
+    if (!auth.user?._id) return;
+    try {
+      const data = await api.fetchRooms(auth.user._id);
+      const roomsData = data.data || data.content || [];
+      const list = Array.isArray(roomsData) ? roomsData : [];
+      setRooms(list);
+      if (socket) {
+        list.forEach((room) => {
+          const rId = room._id || room.roomId || room.id;
+          if (rId) {
+            socket.emit('join-chat-room', rId);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to pre-join rooms:', err);
+    }
+  }, [auth.user?._id, socket]);
+
+  useEffect(() => {
+    refreshRooms();
+  }, [refreshRooms]);
+
+  // Re-join rooms whenever socket connects or reconnects
+  useEffect(() => {
+    if (!socket) return;
+    const handleConnect = () => {
+      refreshRooms();
+    };
+    socket.on('connect', handleConnect);
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [socket, refreshRooms]);
+
   // Handle room creation from socket
   useEffect(() => {
     if (!socket) return;
-    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
     const handleRoomCreated = (data) => {
       if (data.roomId || data._id) {
+        const rId = data.roomId || data._id;
+        if (socket && rId) socket.emit('join-chat-room', rId);
         setSelectedRoom(data);
         showToast('Room created!', 'success');
+        refreshRooms();
       }
     };
 
     const handleDMCreated = (data) => {
-      if (data.room) {
-        setSelectedRoom(data.room);
+      const room = data.room || data.createroom;
+      if (room) {
+        const rId = room._id || room.roomId || room.id;
+        if (socket && rId) socket.emit('join-chat-room', rId);
+        setSelectedRoom(room);
         showToast('Chat started!', 'success');
-      } else if (data.createroom) {
-        setSelectedRoom(data.createroom);
+        refreshRooms();
       }
     };
 
@@ -74,7 +125,79 @@ export function MainLayout() {
       socket.off(SOCKET_EVENTS.ROOM_CREATED, handleRoomCreated);
       socket.off(SOCKET_EVENTS.ROOM_CREATED_WITH_FRIEND, handleDMCreated);
     };
-  }, [socket]);
+  }, [socket, refreshRooms]);
+
+  // Global incoming call listener across all joined rooms
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOfferRead = (offer) => {
+      console.log('Incoming call offer received globally:', offer);
+      const targetRoomId = offer?.roomId;
+      if (!targetRoomId) return;
+
+      // Locate room in rooms list or construct fallback
+      let targetRoom = rooms.find((r) => (r._id || r.roomId || r.id) === targetRoomId);
+      if (!targetRoom) {
+        targetRoom = {
+          _id: targetRoomId,
+          name: offer.roomName || offer.callerName || 'Call',
+          Type: 'friend',
+          members: [offer.callerName || 'Friend'],
+        };
+      }
+
+      // Automatically switch user to that particular room
+      setSelectedRoom(targetRoom);
+      if (isMobile) {
+        setSidebarOpen(false);
+      }
+
+      const callerName = offer.callerName || (
+        Array.isArray(targetRoom?.name)
+          ? targetRoom.name.find((n) => n !== auth.user?.name) || targetRoom.name[0]
+          : targetRoom?.name
+      ) || 'Incoming Call';
+
+      setIncomingCandidates([]);
+      setIncomingCall({
+        offer,
+        roomId: targetRoomId,
+        callerName,
+        callType: offer.callType || 'audio',
+        targetRoom,
+      });
+    };
+
+    const handleCallTypeRead = (data) => {
+      const actual = typeof data === 'object' ? data?.callType : data;
+      if (actual) {
+        setIncomingCall((prev) => (prev ? { ...prev, callType: actual } : null));
+      }
+    };
+
+    const handleIceCandidateRead = (candidate) => {
+      if (candidate) {
+        setIncomingCandidates((current) => [...current, candidate]);
+      }
+    };
+
+    const handleEndCallRead = () => {
+      clearIncomingCall();
+    };
+
+    socket.on('offer-read', handleOfferRead);
+    socket.on('call-type-read', handleCallTypeRead);
+    socket.on('ice-candidate-read', handleIceCandidateRead);
+    socket.on('end-call-read', handleEndCallRead);
+
+    return () => {
+      socket.off('offer-read', handleOfferRead);
+      socket.off('call-type-read', handleCallTypeRead);
+      socket.off('ice-candidate-read', handleIceCandidateRead);
+      socket.off('end-call-read', handleEndCallRead);
+    };
+  }, [socket, rooms, auth.user?.name, isMobile, clearIncomingCall]);
 
   const handleSelectRoom = (room) => {
     setSelectedRoom(room);
@@ -317,7 +440,14 @@ export function MainLayout() {
         {/* Tab Content */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {activeTab === 'chats' && (
-            <MessagesList onSelectRoom={handleSelectRoom} selectedRoomId={selectedRoom?._id} setchatroomactive={setchatroomactive} chatroomactive={chatroomactive} />
+            <MessagesList
+              onSelectRoom={handleSelectRoom}
+              selectedRoomId={selectedRoom?._id}
+              setchatroomactive={setchatroomactive}
+              chatroomactive={chatroomactive}
+              rooms={rooms}
+              onRefreshRooms={refreshRooms}
+            />
           )}
 
           {activeTab === 'search' && (
@@ -392,6 +522,7 @@ export function MainLayout() {
         {/* Chat or Empty State */}
         {selectedRoom ? (
           <ChatRoom
+            key={selectedRoom._id || selectedRoom.roomId || selectedRoom.id}
             roomId={selectedRoom._id || selectedRoom.roomId || selectedRoom.id}
             roomName={selectedRoom.name || selectedRoom.roomname}
             roomMembers={selectedRoom.members || []}
@@ -404,6 +535,9 @@ export function MainLayout() {
                 setSidebarOpen((prev) => !prev);
               }
             }}
+            incomingCall={incomingCall}
+            incomingCandidates={incomingCandidates}
+            onClearIncomingCall={clearIncomingCall}
           />
         ) : (
           <div
